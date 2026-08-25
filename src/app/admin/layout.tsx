@@ -42,10 +42,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-[#0a0a0b]">
         <div className="flex flex-col items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-red-600 flex items-center justify-center">
-            <Shield className="h-5 w-5 text-white" />
+          <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center">
+            <Shield className="h-5 w-5 text-primary-foreground" />
           </div>
-          <div className="h-5 w-5 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
+          <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
         </div>
       </div>
     );
@@ -61,12 +61,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <aside className="w-[260px] bg-white dark:bg-[#111113] border-r border-gray-200/80 dark:border-[#1e1e21] flex flex-col fixed inset-y-0 left-0 z-30">
         {/* Logo */}
         <div className="px-5 h-16 flex items-center gap-2.5 border-b border-gray-200/80 dark:border-[#1e1e21]">
-          <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-red-600 to-red-500 flex items-center justify-center shadow-sm">
-            <Shield className="h-5 w-5 text-white" strokeWidth={2} />
+          <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-sm">
+            <Shield className="h-5 w-5 text-primary-foreground" strokeWidth={2} />
           </div>
           <div>
             <h1 className="text-[15px] font-semibold tracking-tight text-gray-900 dark:text-gray-50">TripSync</h1>
-            <p className="text-[10px] text-red-500 dark:text-red-400 font-semibold uppercase tracking-wider">Super Admin</p>
+            <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">Super Admin</p>
           </div>
         </div>
 
@@ -82,7 +82,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 href={item.href}
                 className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all ${
                   isActive
-                    ? "bg-red-600 text-white shadow-sm shadow-red-600/20"
+                    ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
                     : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#1a1a1d] hover:text-gray-900 dark:hover:text-gray-200"
                 }`}
               >
@@ -104,19 +104,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="px-3 py-3 border-t border-gray-200/80 dark:border-[#1e1e21]">
           <DropdownMenu>
             <DropdownMenuTrigger className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-[#1a1a1d] transition-colors cursor-pointer">
-              <Avatar className="h-9 w-9 ring-2 ring-red-100 dark:ring-red-900/30">
-                <AvatarFallback className="text-xs bg-gradient-to-br from-red-100 to-red-50 text-red-600 font-semibold dark:from-red-900/30 dark:to-red-900/10 dark:text-red-400">
+              <Avatar className="h-9 w-9 ring-2 ring-primary/10 dark:ring-primary/20">
+                <AvatarFallback className="text-xs bg-gradient-to-br from-primary/10 to-primary/5 text-primary font-semibold dark:from-primary/20 dark:to-primary/10">
                   SA
                 </AvatarFallback>
               </Avatar>
               <div className="text-left flex-1 min-w-0">
                 <p className="text-[13px] font-semibold leading-none truncate text-gray-900 dark:text-gray-100">{user.name}</p>
-                <p className="text-[11px] text-red-500 dark:text-red-400 mt-1 font-medium">Super Admin</p>
+                <p className="text-[11px] text-muted-foreground mt-1 font-medium">Super Admin</p>
               </div>
               <Settings className="h-4 w-4 text-gray-300 dark:text-gray-600" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-[230px]">
-              <DropdownMenuItem onClick={() => signOut({ callbackUrl: "/login" })} className="gap-2.5 text-red-500 focus:text-red-500">
+              <DropdownMenuItem onClick={() => signOut({ callbackUrl: "/login" })} className="gap-2.5 text-destructive focus:text-destructive">
                 <LogOut className="h-4 w-4" /> Sign Out
               </DropdownMenuItem>
             </DropdownMenuContent>
