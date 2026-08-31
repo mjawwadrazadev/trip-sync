@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Wallet } from "lucide-react";
+import { Plus, Wallet, Coins, Loader2 } from "lucide-react";
 
 interface Payment {
   _id: string;
@@ -18,17 +18,53 @@ interface Payment {
   payment_method: string;
   status: string;
   created_at: string;
+  allocated_amount: number;
+  unallocated_amount: number;
+}
+
+interface Customer { _id: string; name: string; }
+
+interface LedgerEntry {
+  id: string;
+  type: "invoice" | "payment" | "credit_note";
+  date: string;
+  reference: string;
+  debit: number;
+  credit: number;
+  status: string;
+}
+
+interface AllocationEntry {
+  _id: string;
+  invoice_id: string;
+  allocated_amount: number;
+}
+
+interface InvoiceAllocationRow {
+  invoice_id: string;
+  invoice_number: string;
+  date: string;
+  total: number;
+  allocated: number;
+  balance: number;
+  allocateInput: string;
 }
 
 export default function PaymentsPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [customers, setCustomers] = useState<{ _id: string; name: string }[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
   const [customerId, setCustomerId] = useState("");
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState("PKR");
   const [method, setMethod] = useState("");
+
+  // Allocation state
+  const [allocatingPayment, setAllocatingPayment] = useState<Payment | null>(null);
+  const [loadingInvoices, setLoadingInvoices] = useState(false);
+  const [allocationRows, setAllocationRows] = useState<InvoiceAllocationRow[]>([]);
+  const [submittingAllocation, setSubmittingAllocation] = useState(false);
 
   const load = useCallback(async () => {
     const res = await fetch("/api/payments");
@@ -37,11 +73,122 @@ export default function PaymentsPage() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { load(); fetch("/api/customers").then((r) => r.json()).then((d) => setCustomers(d.customers || [])); }, [load]);
+  useEffect(() => {
+    load();
+    fetch("/api/customers").then((r) => r.json()).then((d) => setCustomers(d.customers || []));
+  }, [load]);
 
   async function create() {
-    const res = await fetch("/api/payments", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ customer_id: customerId, amount: parseFloat(amount), currency, payment_method: method }) });
-    if (res.ok) { setShowNew(false); setCustomerId(""); setAmount(""); setMethod(""); load(); } else { const d = await res.json(); alert(d.error); }
+    const res = await fetch("/api/payments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ customer_id: customerId, amount: parseFloat(amount), currency, payment_method: method }),
+    });
+    if (res.ok) {
+      setShowNew(false);
+      setCustomerId("");
+      setAmount("");
+      setMethod("");
+      load();
+    } else {
+      const d = await res.json();
+      alert(d.error);
+    }
+  }
+
+  // Load unpaid invoices and their current allocations for the customer
+  const startAllocation = async (payment: Payment) => {
+    setAllocatingPayment(payment);
+    setLoadingInvoices(true);
+    setAllocationRows([]);
+    
+    const custId = typeof payment.customer_id === "object" ? payment.customer_id._id : payment.customer_id;
+    try {
+      const res = await fetch(`/api/customers/${custId}/ledger`);
+      const data = await res.json();
+      
+      const invoices = (data.entries || []).filter((e: LedgerEntry) => e.type === "invoice" && e.status === "Posted");
+      const allocations = (data.allocations || []) as AllocationEntry[];
+      
+      // Calculate balance for each invoice
+      const rows: InvoiceAllocationRow[] = invoices.map((inv: LedgerEntry) => {
+        // Sum allocations for this invoice
+        const invoiceAllocated = allocations
+          .filter((a: AllocationEntry) => a.invoice_id === inv.id)
+          .reduce((sum: number, a: AllocationEntry) => sum + a.allocated_amount, 0);
+          
+        const balance = inv.debit - invoiceAllocated;
+        
+        return {
+          invoice_id: inv.id,
+          invoice_number: inv.reference,
+          date: inv.date,
+          total: inv.debit,
+          allocated: invoiceAllocated,
+          balance: balance,
+          allocateInput: "",
+        };
+      }).filter((row: InvoiceAllocationRow) => row.balance > 0);
+      
+      setAllocationRows(rows);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to load customer outstanding invoices");
+    } finally {
+      setLoadingInvoices(false);
+    }
+  };
+
+  const handleAllocationInputChange = (invoiceId: string, val: string) => {
+    setAllocationRows(prev =>
+      prev.map(row => (row.invoice_id === invoiceId ? { ...row, allocateInput: val } : row))
+    );
+  };
+
+  async function submitAllocation() {
+    if (!allocatingPayment) return;
+    setSubmittingAllocation(true);
+    
+    // Filter out rows with empty or zero values
+    const allocationsToSubmit = allocationRows
+      .map(row => ({
+        invoice_id: row.invoice_id,
+        amount: parseFloat(row.allocateInput) || 0,
+      }))
+      .filter(a => a.amount > 0);
+      
+    if (allocationsToSubmit.length === 0) {
+      alert("Please enter a valid amount for at least one invoice.");
+      setSubmittingAllocation(false);
+      return;
+    }
+    
+    const totalAllocated = allocationsToSubmit.reduce((sum, a) => sum + a.amount, 0);
+    if (totalAllocated > allocatingPayment.unallocated_amount) {
+      alert(`Allocated total (${totalAllocated.toLocaleString()}) cannot exceed the unallocated payment balance (${allocatingPayment.unallocated_amount.toLocaleString()})`);
+      setSubmittingAllocation(false);
+      return;
+    }
+    
+    try {
+      const res = await fetch(`/api/payments/${allocatingPayment._id}/allocate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ allocations: allocationsToSubmit }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || "Failed to submit allocation");
+      } else {
+        setAllocatingPayment(null);
+        load();
+      }
+    } catch (err) {
+      console.error(err);
+      alert("An error occurred");
+    } finally {
+      setSubmittingAllocation(false);
+    }
   }
 
   const statusStyles: Record<string, string> = {
@@ -109,19 +256,34 @@ export default function PaymentsPage() {
                     <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Method</TableHead>
                     <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Status</TableHead>
                     <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Date</TableHead>
+                    <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {payments.length === 0 ? (
-                    <TableRow><TableCell colSpan={6} className="text-center py-12 text-[13px] text-gray-400">No payments yet</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={7} className="text-center py-12 text-[13px] text-gray-400">No payments yet</TableCell></TableRow>
                   ) : payments.map((p) => (
                     <TableRow key={p._id} className="border-gray-100 dark:border-[#1e1e21] hover:bg-gray-50/50 dark:hover:bg-[#151517]">
                       <TableCell className="text-[13px] font-semibold text-gray-900 dark:text-gray-100">{typeof p.customer_id === "object" ? p.customer_id.name : "-"}</TableCell>
-                      <TableCell className="text-right font-mono text-[13px] font-semibold text-gray-900 dark:text-gray-100">{p.amount.toLocaleString()}</TableCell>
+                      <TableCell className="text-right font-mono text-[13px]">
+                        <div className="font-semibold text-gray-900 dark:text-gray-100">{p.amount.toLocaleString()}</div>
+                        {p.allocated_amount > 0 && (
+                          <div className="text-[10px] text-gray-400 mt-0.5">
+                            Allocated: {p.allocated_amount.toLocaleString()} | Left: {p.unallocated_amount.toLocaleString()}
+                          </div>
+                        )}
+                      </TableCell>
                       <TableCell className="text-[13px] text-gray-500">{p.currency}</TableCell>
                       <TableCell className="text-[13px] text-gray-600 dark:text-gray-300">{p.payment_method}</TableCell>
                       <TableCell><span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${statusStyles[p.status] || ""}`}>{p.status}</span></TableCell>
                       <TableCell className="text-[13px] text-gray-500">{new Date(p.created_at).toLocaleDateString()}</TableCell>
+                      <TableCell>
+                        {p.status === "Posted" && p.unallocated_amount > 0 && (
+                          <Button size="sm" variant="outline" className="h-8 gap-1.5 text-[12px] cursor-pointer" onClick={() => startAllocation(p)}>
+                            <Coins className="h-3 w-3" /> Allocate
+                          </Button>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -130,6 +292,96 @@ export default function PaymentsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Allocate Payment Dialog */}
+      <Dialog open={!!allocatingPayment} onOpenChange={(open) => !open && setAllocatingPayment(null)}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold">Allocate Payment</DialogTitle>
+          </DialogHeader>
+          
+          {allocatingPayment && (
+            <div className="space-y-5 pt-2">
+              <div className="p-4 rounded-xl bg-gray-50 dark:bg-[#0e0e10]/30 border border-gray-100 dark:border-[#1e1e21] grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Customer</p>
+                  <p className="text-[13px] font-semibold text-gray-900 dark:text-gray-100 mt-0.5">
+                    {typeof allocatingPayment.customer_id === "object" ? allocatingPayment.customer_id.name : "-"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 text-right">Payment Amount</p>
+                  <p className="text-[13px] font-bold text-gray-900 dark:text-gray-100 mt-0.5 text-right font-mono">
+                    {allocatingPayment.currency} {allocatingPayment.amount.toLocaleString()}
+                  </p>
+                </div>
+                <div className="col-span-2 border-t border-gray-200/50 dark:border-[#1e1e21] pt-3 flex justify-between items-center">
+                  <span className="text-[12px] font-semibold text-gray-500">Unallocated Balance:</span>
+                  <span className="text-sm font-bold text-primary font-mono">
+                    {allocatingPayment.currency} {allocatingPayment.unallocated_amount.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-[12px] font-semibold text-gray-700 dark:text-gray-300 mb-3">Outstanding Invoices</p>
+                
+                {loadingInvoices ? (
+                  <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
+                ) : allocationRows.length === 0 ? (
+                  <p className="text-center py-8 text-[13px] text-gray-400 bg-gray-50/50 dark:bg-[#0e0e10]/10 rounded-xl border border-dashed border-gray-200 dark:border-[#1e1e21]">
+                    No outstanding posted invoices found for this customer.
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto border border-gray-100 dark:border-[#1e1e21] rounded-xl">
+                    <Table>
+                      <TableHeader className="bg-gray-50/50 dark:bg-[#0e0e10]/30">
+                        <TableRow className="border-gray-100 dark:border-[#1e1e21]">
+                          <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Invoice #</TableHead>
+                          <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Date</TableHead>
+                          <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 text-right">Total</TableHead>
+                          <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 text-right">Remaining</TableHead>
+                          <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 w-[180px] text-right">Allocate Amount</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {allocationRows.map((row) => (
+                          <TableRow key={row.invoice_id} className="border-gray-100 dark:border-[#1e1e21]">
+                            <TableCell className="font-mono text-[13px] font-medium text-gray-900 dark:text-gray-100">{row.invoice_number}</TableCell>
+                            <TableCell className="text-[12px] text-gray-500">{new Date(row.date).toLocaleDateString()}</TableCell>
+                            <TableCell className="text-right font-mono text-[13px] text-gray-600 dark:text-gray-300">{row.total.toLocaleString()}</TableCell>
+                            <TableCell className="text-right font-mono text-[13px] font-semibold text-emerald-600 dark:text-emerald-400">{row.balance.toLocaleString()}</TableCell>
+                            <TableCell className="text-right">
+                              <Input
+                                type="number"
+                                placeholder="0.00"
+                                value={row.allocateInput}
+                                onChange={(e) => handleAllocationInputChange(row.invoice_id, e.target.value)}
+                                className="h-9 font-mono text-[13px] text-right w-full max-w-[150px] inline-block"
+                                max={Math.min(allocatingPayment.unallocated_amount, row.balance)}
+                              />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-3 justify-end pt-3 border-t border-gray-100 dark:border-[#1e1e21]">
+                <Button variant="outline" onClick={() => setAllocatingPayment(null)} disabled={submittingAllocation} className="h-10 cursor-pointer">
+                  Cancel
+                </Button>
+                <Button onClick={submitAllocation} disabled={submittingAllocation || allocationRows.length === 0} className="h-10 gap-2 cursor-pointer">
+                  {submittingAllocation && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Confirm Allocation
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

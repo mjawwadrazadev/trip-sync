@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
 
     // Create line items
     const lineItemDocs = await InvoiceLineItem.insertMany(
-      line_items.map((item: Record<string, unknown>) => ({
+      line_items.map((item: { service_type?: string; description?: string; amount?: number; tax_code_id?: string; booking_reference?: string; commission_override_rate?: string | number | null }) => ({
         invoice_id: invoice._id,
         tenant_id: user.tenant_id,
         service_type: item.service_type || "Other",
@@ -82,6 +82,7 @@ export async function POST(req: NextRequest) {
         amount: item.amount,
         tax_code_id: item.tax_code_id || null,
         booking_reference: item.booking_reference || null,
+        commission_override_rate: item.commission_override_rate !== undefined && item.commission_override_rate !== "" && item.commission_override_rate !== null ? parseFloat(String(item.commission_override_rate)) : null,
       }))
     );
 

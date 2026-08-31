@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { withAuth, successResponse, errorResponse } from "@/lib/api-helpers";
-import { Payment } from "@/models";
+import { Payment, PaymentAllocation } from "@/models";
 import { logChanges } from "@/lib/audit";
 
 export async function GET(req: NextRequest) {
@@ -18,7 +18,20 @@ export async function GET(req: NextRequest) {
       Payment.countDocuments(filter),
     ]);
 
-    return successResponse({ payments, total, page, pages: Math.ceil(total / limit) });
+    const paymentIds = payments.map((p) => p._id);
+    const allocations = await PaymentAllocation.find({ payment_id: { $in: paymentIds } }).lean();
+
+    const paymentsWithAllocation = payments.map((p) => {
+      const pAllocations = allocations.filter((a) => a.payment_id.toString() === p._id.toString());
+      const allocated_amount = pAllocations.reduce((sum, a) => sum + a.allocated_amount, 0);
+      return {
+        ...p,
+        allocated_amount,
+        unallocated_amount: p.amount - allocated_amount,
+      };
+    });
+
+    return successResponse({ payments: paymentsWithAllocation, total, page, pages: Math.ceil(total / limit) });
   });
 }
 

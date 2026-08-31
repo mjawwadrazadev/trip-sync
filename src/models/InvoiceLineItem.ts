@@ -11,6 +11,7 @@ export interface IInvoiceLineItem extends Document {
   tax_code_id: Types.ObjectId | null;
   commission_id: Types.ObjectId | null;
   booking_reference: string | null;
+  commission_override_rate: number | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -25,6 +26,7 @@ const InvoiceLineItemSchema = new Schema<IInvoiceLineItem>(
     tax_code_id: { type: Schema.Types.ObjectId, ref: "TaxCode", default: null },
     commission_id: { type: Schema.Types.ObjectId, ref: "Commission", default: null },
     booking_reference: { type: String, default: null },
+    commission_override_rate: { type: Number, default: null },
   },
   { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } }
 );

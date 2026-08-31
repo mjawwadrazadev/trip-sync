@@ -77,24 +77,26 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     customer.current_balance += invoice.total_amount;
     await customer.save();
 
-    // Generate commissions for line items
+    const creator = await User.findById(user.user_id);
     const lineItems = await InvoiceLineItem.find({ invoice_id: invoice._id });
     for (const item of lineItems) {
-      // Find an agent (for now use the invoice creator if they are an Agent)
-      const creator = await User.findById(user.user_id);
-      if (creator && creator.role === "Agent" && creator.default_commission_rate) {
-        const commission = await Commission.create({
-          tenant_id: user.tenant_id,
-          agent_id: user.user_id,
-          invoice_line_item_id: item._id,
-          rate_source: "AgentDefault",
-          rate_applied: creator.default_commission_rate,
-          amount: (item.amount * creator.default_commission_rate) / 100,
-          status: "Posted",
-          created_by: user.user_id,
-        });
-        item.commission_id = commission._id;
-        await item.save();
+      if (creator && creator.role === "Agent") {
+        const hasOverride = item.commission_override_rate !== null && item.commission_override_rate !== undefined;
+        const rateApplied = hasOverride ? item.commission_override_rate! : creator.default_commission_rate;
+        if (rateApplied !== undefined && rateApplied !== null) {
+          const commission = await Commission.create({
+            tenant_id: user.tenant_id,
+            agent_id: user.user_id,
+            invoice_line_item_id: item._id,
+            rate_source: hasOverride ? "InvoiceOverride" : "AgentDefault",
+            rate_applied: rateApplied,
+            amount: (item.amount * rateApplied) / 100,
+            status: "Posted",
+            created_by: user.user_id,
+          });
+          item.commission_id = commission._id;
+          await item.save();
+        }
       }
     }
 

@@ -29,6 +29,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     // Build ledger entries
     const entries = [
       ...invoices.map((inv) => ({
+        id: inv._id.toString(),
         type: "invoice" as const,
         date: inv.created_at,
         reference: inv.invoice_number,
@@ -37,6 +38,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         status: inv.status,
       })),
       ...payments.map((pay) => ({
+        id: pay._id.toString(),
         type: "payment" as const,
         date: pay.created_at,
         reference: `PAY-${pay._id.toString().slice(-6)}`,
@@ -47,6 +49,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       ...creditNotes
         .filter((cn) => cn.invoice_id)
         .map((cn) => ({
+          id: cn._id.toString(),
           type: "credit_note" as const,
           date: cn.created_at,
           reference: `CN-${cn._id.toString().slice(-6)}`,

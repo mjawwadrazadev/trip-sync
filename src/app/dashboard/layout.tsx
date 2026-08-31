@@ -28,6 +28,7 @@ import {
   Settings,
   ChevronRight,
   Menu,
+  UserCheck,
 } from "lucide-react";
 
 const navItems = [
@@ -40,6 +41,7 @@ const navItems = [
   { href: "/dashboard/approvals", label: "Approvals", icon: CheckCircle },
   { href: "/dashboard/tax-codes", label: "Tax Codes", icon: Landmark },
   { href: "/dashboard/reports", label: "Reports", icon: BarChart3 },
+  { href: "/dashboard/agents", label: "Team & Agents", icon: UserCheck },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useSession } from "next-auth/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Send, Ban, CreditCard, Trash2 } from "lucide-react";
+import { Plus, Send, Ban, CreditCard, Trash2, History, Loader2 } from "lucide-react";
 
 interface Invoice {
   _id: string;
@@ -24,9 +25,19 @@ interface Invoice {
 }
 
 interface Customer { _id: string; name: string; }
-interface LineItemInput { service_type: string; description: string; amount: string; }
+interface LineItemInput { service_type: string; description: string; amount: string; commission_override_rate: string; }
+
+interface AuditLogEntry {
+  _id: string;
+  field_changed: string;
+  old_value: string | number | boolean | null;
+  new_value: string | number | boolean | null;
+  changed_by: { name: string } | null;
+  changed_at: string;
+}
 
 export default function InvoicesPage() {
+  const { data: session } = useSession();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,9 +50,31 @@ export default function InvoicesPage() {
   const [newCustomerId, setNewCustomerId] = useState("");
   const [newCurrency, setNewCurrency] = useState("PKR");
   const [newBsp, setNewBsp] = useState(false);
+  const [newBspBillingPeriod, setNewBspBillingPeriod] = useState("");
   const [lineItems, setLineItems] = useState<LineItemInput[]>([
-    { service_type: "Ticket", description: "", amount: "" },
+    { service_type: "Ticket", description: "", amount: "", commission_override_rate: "" },
   ]);
+
+  // Audit Logs state
+  const [auditDialogInvoice, setAuditDialogInvoice] = useState<Invoice | null>(null);
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+
+  const loadAuditLogs = async (invoice: Invoice) => {
+    setAuditDialogInvoice(invoice);
+    setLoadingLogs(true);
+    try {
+      const res = await fetch(`/api/audit-log?entity_type=Invoice&entity_id=${invoice._id}`);
+      const data = await res.json();
+      setAuditLogs(data.audit_logs || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingLogs(false);
+    }
+  };
+
+  const isManager = ["Owner", "Accountant"].includes((session?.user as { role?: string })?.role || "");
 
   const loadInvoices = useCallback(async () => {
     const res = await fetch("/api/invoices");
@@ -61,10 +94,22 @@ export default function InvoicesPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         customer_id: newCustomerId, currency: newCurrency, bsp_flag: newBsp,
-        line_items: lineItems.map((li) => ({ service_type: li.service_type, description: li.description, amount: parseFloat(li.amount) || 0 })),
+        bsp_billing_period: newBsp ? newBspBillingPeriod : null,
+        line_items: lineItems.map((li) => ({
+          service_type: li.service_type,
+          description: li.description,
+          amount: parseFloat(li.amount) || 0,
+          commission_override_rate: li.commission_override_rate !== "" ? parseFloat(li.commission_override_rate) : null
+        })),
       }),
     });
-    if (res.ok) { setShowNew(false); setLineItems([{ service_type: "Ticket", description: "", amount: "" }]); setNewCustomerId(""); loadInvoices(); }
+    if (res.ok) {
+      setShowNew(false);
+      setLineItems([{ service_type: "Ticket", description: "", amount: "", commission_override_rate: "" }]);
+      setNewCustomerId("");
+      setNewBspBillingPeriod("");
+      loadInvoices();
+    }
   }
 
   async function postInvoice(id: string) {
@@ -131,16 +176,24 @@ export default function InvoicesPage() {
                 </div>
               </div>
 
-              <label className="flex items-center gap-2.5 cursor-pointer">
-                <input type="checkbox" checked={newBsp} onChange={(e) => setNewBsp(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" />
-                <span className="text-[13px] font-medium text-gray-700 dark:text-gray-300">BSP Transaction</span>
-              </label>
+              <div className="flex flex-col sm:flex-row gap-4 items-center">
+                <label className="flex items-center gap-2.5 cursor-pointer">
+                  <input type="checkbox" checked={newBsp} onChange={(e) => setNewBsp(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" />
+                  <span className="text-[13px] font-medium text-gray-700 dark:text-gray-300">BSP Transaction</span>
+                </label>
+                {newBsp && (
+                  <div className="flex-1 w-full space-y-1.5">
+                    <Label className="text-[13px]">BSP Billing Period</Label>
+                    <Input placeholder="e.g. 2026-08 1st half" value={newBspBillingPeriod} onChange={(e) => setNewBspBillingPeriod(e.target.value)} className="h-9 text-[13px]" />
+                  </div>
+                )}
+              </div>
 
               <div>
                 <Label className="text-[13px] mb-3 block">Line Items</Label>
                 <div className="space-y-3 sm:space-y-2">
                   {lineItems.map((li, i) => (
-                    <div key={i} className="flex flex-col sm:grid sm:grid-cols-[140px_1fr_120px_36px] gap-2.5 sm:gap-2 p-3 sm:p-0 rounded-xl border border-gray-200/60 dark:border-[#1e1e21] sm:border-none bg-gray-50/40 dark:bg-[#0e0e10]/30 sm:bg-transparent items-stretch sm:items-center">
+                    <div key={i} className="flex flex-col sm:grid sm:grid-cols-[130px_1fr_110px_90px_36px] gap-2.5 sm:gap-2 p-3 sm:p-0 rounded-xl border border-gray-200/60 dark:border-[#1e1e21] sm:border-none bg-gray-50/40 dark:bg-[#0e0e10]/30 sm:bg-transparent items-stretch sm:items-center">
                       <div className="flex gap-2 items-center sm:block">
                         <span className="text-[11px] font-semibold text-gray-400 uppercase sm:hidden w-[80px] flex-shrink-0">Service</span>
                         <Select value={li.service_type} onValueChange={(v) => v && updateLineItem(i, "service_type", v)}>
@@ -156,6 +209,10 @@ export default function InvoicesPage() {
                         <span className="text-[11px] font-semibold text-gray-400 uppercase sm:hidden w-[80px] flex-shrink-0">Amount</span>
                         <Input placeholder="Amount" type="number" value={li.amount} onChange={(e) => updateLineItem(i, "amount", e.target.value)} className="h-9 text-[13px] font-mono flex-1 sm:w-full" />
                       </div>
+                      <div className="flex gap-2 items-center sm:block">
+                        <span className="text-[11px] font-semibold text-gray-400 uppercase sm:hidden w-[80px] flex-shrink-0">Comm %</span>
+                        <Input placeholder="Override" type="number" value={li.commission_override_rate} onChange={(e) => updateLineItem(i, "commission_override_rate", e.target.value)} className="h-9 text-[13px] font-mono flex-1 sm:w-full" />
+                      </div>
                       {lineItems.length > 1 && (
                         <div className="flex justify-end sm:block">
                           <button onClick={() => setLineItems(lineItems.filter((_, idx) => idx !== i))} className="h-9 px-3 sm:px-0 sm:w-9 flex items-center justify-center gap-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 text-gray-400 hover:text-red-500 transition-colors border border-gray-200 sm:border-none w-full sm:w-auto">
@@ -167,7 +224,7 @@ export default function InvoicesPage() {
                     </div>
                   ))}
                 </div>
-                <Button variant="outline" size="sm" className="mt-3 gap-1.5 text-[12px]" onClick={() => setLineItems([...lineItems, { service_type: "Ticket", description: "", amount: "" }])}>
+                <Button variant="outline" size="sm" className="mt-3 gap-1.5 text-[12px]" onClick={() => setLineItems([...lineItems, { service_type: "Ticket", description: "", amount: "", commission_override_rate: "" }])}>
                   <Plus className="h-3 w-3" /> Add Line
                 </Button>
               </div>
@@ -242,6 +299,11 @@ export default function InvoicesPage() {
                               </Button>
                             </>
                           )}
+                          {isManager && (
+                            <Button size="sm" variant="outline" className="h-8 gap-1.5 text-[12px] cursor-pointer" onClick={() => loadAuditLogs(inv)}>
+                              <History className="h-3 w-3" /> Logs
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -285,6 +347,43 @@ export default function InvoicesPage() {
             <Button onClick={issueCreditNote} disabled={!creditAmount || !creditReason} className="w-full gap-2">
               <CreditCard className="h-4 w-4" /> Issue Credit Note
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Audit Trail Dialog */}
+      <Dialog open={!!auditDialogInvoice} onOpenChange={(open) => !open && setAuditDialogInvoice(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold">Audit Trail — {auditDialogInvoice?.invoice_number}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            {loadingLogs ? (
+              <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
+            ) : auditLogs.length === 0 ? (
+              <p className="text-center py-8 text-[13px] text-gray-400">No change logs recorded for this invoice.</p>
+            ) : (
+              <div className="space-y-3">
+                {auditLogs.map((log) => (
+                  <div key={log._id} className="p-3 rounded-lg border border-gray-100 dark:border-[#1e1e21] bg-gray-50/30 dark:bg-[#0e0e10]/10 text-[12px] space-y-1">
+                    <div className="flex justify-between items-center">
+                      <span className="font-semibold text-gray-700 dark:text-gray-300">Field: {log.field_changed}</span>
+                      <span className="text-gray-400 text-[10px]">{new Date(log.changed_at).toLocaleString()}</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-gray-500 font-mono text-[11px] bg-white dark:bg-[#111113] p-1.5 rounded border border-gray-100 dark:border-[#1e1e21] mt-1">
+                      <div><span className="text-red-500 font-semibold">Old:</span> {log.old_value !== null ? String(log.old_value) : "null"}</div>
+                      <div><span className="text-emerald-500 font-semibold">New:</span> {log.new_value !== null ? String(log.new_value) : "null"}</div>
+                    </div>
+                    <div className="text-gray-400 text-[10px] pt-1">
+                      Changed by: <span className="font-semibold text-gray-600 dark:text-gray-400">{log.changed_by?.name || "System"}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex justify-end pt-3 border-t border-gray-100 dark:border-[#1e1e21]">
+              <Button variant="outline" onClick={() => setAuditDialogInvoice(null)}>Close</Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

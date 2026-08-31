@@ -24,9 +24,12 @@ export default function ExpensesPage() {
   const [types, setTypes] = useState<{ _id: string; name: string; requires_approval: boolean }[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
+  const [showNewType, setShowNewType] = useState(false);
   const [typeId, setTypeId] = useState("");
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
+  const [newTypeName, setNewTypeName] = useState("");
+  const [requiresApproval, setRequiresApproval] = useState(false);
 
   const load = useCallback(async () => {
     const [expRes, typeRes] = await Promise.all([fetch("/api/expenses"), fetch("/api/expense-types")]);
@@ -41,6 +44,11 @@ export default function ExpensesPage() {
     if (res.ok) { setShowNew(false); setTypeId(""); setAmount(""); setDescription(""); load(); }
   }
 
+  async function createType() {
+    const res = await fetch("/api/expense-types", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: newTypeName, requires_approval: requiresApproval }) });
+    if (res.ok) { setShowNewType(false); setNewTypeName(""); setRequiresApproval(false); load(); }
+  }
+
   const statusStyles: Record<string, string> = {
     Draft: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
     PendingApproval: "bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400",
@@ -51,15 +59,36 @@ export default function ExpensesPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-50">Expenses</h1>
           <p className="text-[13px] text-gray-500 dark:text-gray-400 mt-1">Track and manage business expenses</p>
         </div>
-        <Dialog open={showNew} onOpenChange={setShowNew}>
-          <DialogTrigger className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-[13px] font-medium text-primary-foreground hover:bg-primary/90 shadow-sm transition-colors">
-            <Plus className="h-4 w-4" /> Add Expense
-          </DialogTrigger>
+        <div className="flex items-center gap-2.5">
+          <Dialog open={showNewType} onOpenChange={setShowNewType}>
+            <DialogTrigger className="inline-flex items-center gap-2 rounded-lg border border-gray-200 dark:border-[#1e1e21] bg-white dark:bg-[#111113] px-4 py-2.5 text-[13px] font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#151517] shadow-sm transition-colors cursor-pointer">
+              <Plus className="h-4 w-4" /> New Expense Type
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader><DialogTitle className="text-lg font-semibold">Add Expense Type</DialogTitle></DialogHeader>
+              <div className="space-y-4 pt-2">
+                <div className="space-y-1.5"><Label className="text-[13px]">Type Name</Label><Input value={newTypeName} onChange={(e) => setNewTypeName(e.target.value)} placeholder="e.g. Office Refreshments" className="h-10" /></div>
+                <label className="flex items-center gap-2.5 cursor-pointer py-1">
+                  <input type="checkbox" checked={requiresApproval} onChange={(e) => setRequiresApproval(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" />
+                  <span className="text-[13px] font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                    Requires Manager Approval
+                    <ShieldCheck className="h-3.5 w-3.5 text-amber-500" />
+                  </span>
+                </label>
+                <Button onClick={createType} disabled={!newTypeName} className="w-full h-10 gap-2">Create Type</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={showNew} onOpenChange={setShowNew}>
+            <DialogTrigger className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-[13px] font-medium text-primary-foreground hover:bg-primary/90 shadow-sm transition-colors cursor-pointer">
+              <Plus className="h-4 w-4" /> Add Expense
+            </DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle className="text-lg font-semibold">Add Expense</DialogTitle></DialogHeader>
             <div className="space-y-4 pt-2">
@@ -85,6 +114,7 @@ export default function ExpensesPage() {
             </div>
           </DialogContent>
         </Dialog>
+      </div>
       </div>
 
       <Card className="bg-white dark:bg-[#111113] border-gray-200/80 dark:border-[#1e1e21] shadow-sm">
