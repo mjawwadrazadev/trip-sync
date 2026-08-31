@@ -235,7 +235,7 @@ function renderNavItem(item: (typeof navItems)[number], pathname: string, search
           isActive && !activeType && !item.children
             ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
             : isActive
-            ? "bg-primary/5 text-primary"
+            ? "bg-primary/5 text-primary dark:text-gray-100"
             : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#1a1a1d] hover:text-gray-900 dark:hover:text-gray-200"
         }`}
       >
@@ -254,7 +254,7 @@ function renderNavItem(item: (typeof navItems)[number], pathname: string, search
                 href={child.href}
                 className={`block py-1 px-3 text-[12px] font-medium rounded-lg transition-all ${
                   isChildActive
-                    ? "text-primary font-semibold bg-primary/5 dark:bg-primary/10"
+                    ? "text-primary dark:text-gray-100 font-semibold bg-primary/5 dark:bg-primary/10"
                     : "text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-gray-200"
                 }`}
               >
