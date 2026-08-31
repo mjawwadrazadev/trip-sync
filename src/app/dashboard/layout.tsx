@@ -29,6 +29,8 @@ import {
   ChevronRight,
   Menu,
   UserCheck,
+  Calendar,
+  Building2,
 } from "lucide-react";
 
 interface NavChild {
@@ -60,7 +62,9 @@ const navItems: NavItem[] = [
       { href: "/dashboard/invoices?type=Other", label: "Others", type: "Other" },
     ],
   },
+  { href: "/dashboard/bookings", label: "Bookings", icon: Calendar },
   { href: "/dashboard/customers", label: "Customers", icon: Users },
+  { href: "/dashboard/suppliers", label: "Suppliers", icon: Building2 },
   { href: "/dashboard/payments", label: "Payments", icon: Wallet },
   { href: "/dashboard/expenses", label: "Expenses", icon: Receipt },
   { href: "/dashboard/commissions", label: "Commissions", icon: TrendingUp },

@@ -13,3 +13,5 @@ export { default as ApprovalRequest } from "./ApprovalRequest";
 export { default as TaxCode } from "./TaxCode";
 export { default as ExchangeRate } from "./ExchangeRate";
 export { default as AuditLog } from "./AuditLog";
+export { default as Supplier } from "./Supplier";
+export { default as Booking } from "./Booking";

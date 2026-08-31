@@ -26,6 +26,21 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const paymentIds = payments.map((p) => p._id);
     const allocations = await PaymentAllocation.find({ payment_id: { $in: paymentIds } }).lean();
 
+    // Calculate dynamic self-healing balance
+    const totalInvoiced = invoices
+      .filter((inv) => inv.status === "Posted")
+      .reduce((sum, inv) => sum + inv.total_amount, 0);
+    const totalAllocated = allocations.reduce((sum, a) => sum + a.allocated_amount, 0);
+    const totalCredits = creditNotes
+      .filter((cn) => cn.invoice_id)
+      .reduce((sum, cn) => sum + cn.amount, 0);
+    const calculatedBalance = totalInvoiced - totalAllocated - totalCredits;
+
+    if (customer.current_balance !== calculatedBalance) {
+      customer.current_balance = calculatedBalance;
+      await customer.save();
+    }
+
     // Build ledger entries
     const entries = [
       ...invoices.map((inv) => ({
@@ -61,7 +76,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     return successResponse({
       customer: { id: customer._id, name: customer.name, credit_limit: customer.credit_limit },
-      current_balance: customer.current_balance,
+      current_balance: calculatedBalance,
       entries,
       allocations,
     });

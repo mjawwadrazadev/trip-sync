@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart3, Clock, TrendingUp, TrendingDown, Loader2, Printer, FileText } from "lucide-react";
+import { BarChart3, Clock, TrendingUp, TrendingDown, Loader2, Printer, FileText, UserCheck } from "lucide-react";
 
 interface InvoiceDetail {
   id: string;
@@ -29,6 +29,15 @@ interface ExpenseDetail {
   currency: string;
 }
 
+interface AgentPerformanceDetail {
+  id: string;
+  name: string;
+  email: string;
+  sales: number;
+  commission: number;
+  invoice_count: number;
+}
+
 interface PnlData {
   period: { from: string; to: string };
   base_currency: string;
@@ -40,6 +49,7 @@ interface PnlData {
   invoices: InvoiceDetail[];
   expenses_detail: ExpenseDetail[];
   revenue_by_type: Record<string, number>;
+  agent_performance: AgentPerformanceDetail[];
 }
 
 interface AgingEntry {
@@ -101,6 +111,7 @@ export default function ReportsPage() {
         <TabsList className="mb-6">
           <TabsTrigger value="pnl" className="gap-2"><BarChart3 className="h-3.5 w-3.5" /> Profit &amp; Loss</TabsTrigger>
           <TabsTrigger value="aging" className="gap-2"><Clock className="h-3.5 w-3.5" /> Dues &amp; Aging</TabsTrigger>
+          <TabsTrigger value="agents" className="gap-2"><UserCheck className="h-3.5 w-3.5" /> Agent Performance</TabsTrigger>
         </TabsList>
 
         <TabsContent value="pnl">
@@ -312,6 +323,58 @@ export default function ReportsPage() {
                           <TableCell className="text-right font-mono text-[13px] text-orange-600 dark:text-orange-400">{a.days_90.toLocaleString()}</TableCell>
                           <TableCell className="text-right font-mono text-[13px] font-semibold text-red-600 dark:text-red-400">{a.over_90.toLocaleString()}</TableCell>
                           <TableCell className="text-right font-mono text-[13px] font-bold text-gray-900 dark:text-gray-100">{a.total.toLocaleString()}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="agents">
+          <Card className="bg-white dark:bg-[#111113] border-gray-200/80 dark:border-[#1e1e21] shadow-sm">
+            <CardHeader className="px-6 pt-5 pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-[15px] font-semibold text-gray-900 dark:text-gray-50">Agent Performance Report</CardTitle>
+                {pnl && (
+                  <Button variant="outline" size="sm" onClick={printReport} className="gap-2 text-[12px]">
+                    <Printer className="h-3.5 w-3.5" /> Print Report
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="px-6 pb-5">
+              {!pnl ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <div className="h-14 w-14 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4">
+                    <UserCheck className="h-7 w-7 text-gray-400" strokeWidth={1.5} />
+                  </div>
+                  <p className="text-[13px] text-gray-400">Generate Profit &amp; Loss report first to load agent data</p>
+                </div>
+              ) : pnl.agent_performance.length === 0 ? (
+                <p className="text-center py-12 text-[13px] text-gray-400">No agents registered or sales recorded in this period.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-gray-100 dark:border-[#1e1e21]">
+                        <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Agent Name</TableHead>
+                        <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Email</TableHead>
+                        <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 text-right">Invoices Posted</TableHead>
+                        <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 text-right">Total Sales ({pnl.base_currency})</TableHead>
+                        <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 text-right">Commission Earned ({pnl.base_currency})</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {pnl.agent_performance.map((ap) => (
+                        <TableRow key={ap.id} className="border-gray-100 dark:border-[#1e1e21] hover:bg-gray-50/50 dark:hover:bg-[#151517]">
+                          <TableCell className="text-[13px] font-semibold text-gray-900 dark:text-gray-100">{ap.name}</TableCell>
+                          <TableCell className="text-[13px] text-gray-500">{ap.email}</TableCell>
+                          <TableCell className="text-right font-mono text-[13px] text-gray-600 dark:text-gray-300">{ap.invoice_count.toLocaleString()}</TableCell>
+                          <TableCell className="text-right font-mono text-[13px] font-semibold text-emerald-600 dark:text-emerald-400">{ap.sales.toLocaleString()}</TableCell>
+                          <TableCell className="text-right font-mono text-[13px] font-bold text-gray-900 dark:text-gray-100">{ap.commission.toLocaleString()}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

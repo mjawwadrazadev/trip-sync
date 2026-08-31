@@ -1,0 +1,243 @@
+﻿"use client";
+
+import { useEffect, useState, useCallback } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Building2, Plus, Phone, Mail, BadgeDollarSign, Loader2, Landmark } from "lucide-react";
+
+interface Supplier {
+  _id: string;
+  name: string;
+  code: string;
+  currency: string;
+  contact_email: string;
+  contact_phone: string;
+  current_balance: number;
+  created_at: string;
+}
+
+interface Booking {
+  _id: string;
+  booking_reference: string;
+  service_type: string;
+  gds_pnr: string;
+  total_cost: number;
+  total_price: number;
+  status: string;
+  created_at: string;
+}
+
+export default function SuppliersPage() {
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showNew, setShowNew] = useState(false);
+  const [name, setName] = useState("");
+  const [code, setCode] = useState("");
+  const [currency, setCurrency] = useState("PKR");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+
+  // Ledger modal
+  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
+  const [supplierBookings, setSupplierBookings] = useState<Booking[]>([]);
+  const [loadingBookings, setLoadingBookings] = useState(false);
+
+  const load = useCallback(async () => {
+    const res = await fetch("/api/suppliers");
+    const data = await res.json();
+    setSuppliers(data.suppliers || []);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function create() {
+    const res = await fetch("/api/suppliers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, code, currency, contact_email: email, contact_phone: phone }),
+    });
+    if (res.ok) {
+      setShowNew(false);
+      setName("");
+      setCode("");
+      setEmail("");
+      setPhone("");
+      load();
+    } else {
+      const d = await res.json();
+      alert(d.error || "Failed to create supplier");
+    }
+  }
+
+  async function openSupplierLedger(sup: Supplier) {
+    setSelectedSupplier(sup);
+    setLoadingBookings(true);
+    const res = await fetch(`/api/bookings?supplier_id=${sup._id}`);
+    const data = await res.json();
+    setSupplierBookings(data.bookings || []);
+    setLoadingBookings(false);
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-50">Suppliers</h1>
+          <p className="text-[13px] text-gray-500 dark:text-gray-400 mt-1">Manage vendor directories and running balances</p>
+        </div>
+        <Dialog open={showNew} onOpenChange={setShowNew}>
+          <DialogTrigger className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-[13px] font-medium text-primary-foreground hover:bg-primary/90 shadow-sm transition-colors">
+            <Plus className="h-4 w-4" /> Add Supplier
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="text-lg font-semibold">Add New Supplier</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-2">
+              <div className="space-y-1.5">
+                <Label className="text-[13px]">Supplier Name</Label>
+                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. flydubai" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-[13px]">Supplier Code</Label>
+                  <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g. FZ" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[13px]">Currency</Label>
+                  <Select value={currency} onValueChange={(v) => v && setCurrency(v)}>
+                    <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                    <SelectContent>{["PKR", "USD", "GBP", "SAR", "AED"].map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[13px]">Contact Phone</Label>
+                <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="e.g. +971 4 292 2222" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[13px]">Contact Email</Label>
+                <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="e.g. vendor@supplier.com" />
+              </div>
+              <Button onClick={create} disabled={!name} className="w-full h-10 gap-2"><Landmark className="h-4 w-4" /> Add Supplier</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <Card className="bg-white dark:bg-[#111113] border-gray-200/80 dark:border-[#1e1e21] shadow-sm">
+        <CardHeader className="px-6 pt-5 pb-3">
+          <CardTitle className="text-[15px] font-semibold text-gray-900 dark:text-gray-50">Supplier Records</CardTitle>
+        </CardHeader>
+        <CardContent className="px-6 pb-5">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-gray-100 dark:border-[#1e1e21]">
+                    <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Supplier Name</TableHead>
+                    <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Code</TableHead>
+                    <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Currency</TableHead>
+                    <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 text-right">Owed Balance</TableHead>
+                    <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Contact Details</TableHead>
+                    <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {suppliers.length === 0 ? (
+                    <TableRow><TableCell colSpan={6} className="text-center py-12 text-[13px] text-gray-400">No suppliers registered yet.</TableCell></TableRow>
+                  ) : suppliers.map((sup) => (
+                    <TableRow key={sup._id} className="border-gray-100 dark:border-[#1e1e21] hover:bg-gray-50/50 dark:hover:bg-[#151517]">
+                      <TableCell className="text-[13px] font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2 py-3.5">
+                        <Building2 className="h-4 w-4 text-gray-400" />
+                        {sup.name}
+                      </TableCell>
+                      <TableCell className="font-mono text-[13px] text-gray-500">{sup.code || "—"}</TableCell>
+                      <TableCell className="text-[13px] text-gray-500">{sup.currency}</TableCell>
+                      <TableCell className="text-right font-mono text-[13px] font-bold text-gray-900 dark:text-gray-100">
+                        {sup.current_balance.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-[12px] text-gray-600 dark:text-gray-300">
+                        {sup.contact_phone && <p className="flex items-center gap-1"><Phone className="h-3 w-3 text-gray-400" /> {sup.contact_phone}</p>}
+                        {sup.contact_email && <p className="flex items-center gap-1 mt-0.5"><Mail className="h-3 w-3 text-gray-400" /> {sup.contact_email}</p>}
+                      </TableCell>
+                      <TableCell>
+                        <Button size="sm" variant="outline" className="h-8 gap-1.5 text-[12px]" onClick={() => openSupplierLedger(sup)}>
+                          <BadgeDollarSign className="h-3 w-3" /> Ledger
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Supplier Ledger Dialog */}
+      <Dialog open={!!selectedSupplier} onOpenChange={(open) => !open && setSelectedSupplier(null)}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold">Supplier Ledger — {selectedSupplier?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="p-4 rounded-xl bg-gray-50 dark:bg-[#0e0e10]/50 border border-gray-100 dark:border-[#1e1e21] flex justify-between items-center">
+              <div>
+                <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Total Outstanding Owed</p>
+                <p className="text-2xl font-bold font-mono text-gray-900 dark:text-gray-50 mt-1">
+                  {selectedSupplier?.currency} {selectedSupplier?.current_balance.toLocaleString()}
+                </p>
+              </div>
+            </div>
+            
+            {loadingBookings ? (
+              <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
+            ) : supplierBookings.length === 0 ? (
+              <p className="text-center py-10 text-[13px] text-gray-400">No transactions recorded for this supplier.</p>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-gray-100 dark:border-[#1e1e21]">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-gray-50 dark:bg-[#0e0e10]/30 border-gray-100 dark:border-[#1e1e21]">
+                      <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Reference</TableHead>
+                      <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Type</TableHead>
+                      <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">PNR</TableHead>
+                      <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Date</TableHead>
+                      <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 text-right">Cost (Owed)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {supplierBookings.map((b) => (
+                      <TableRow key={b._id} className="border-gray-100 dark:border-[#1e1e21]">
+                        <TableCell className="font-mono text-[13px] font-medium text-gray-900 dark:text-gray-100">{b.booking_reference}</TableCell>
+                        <TableCell className="text-[13px] text-gray-500">{b.service_type}</TableCell>
+                        <TableCell className="font-mono text-[12px] text-gray-500">{b.gds_pnr || "—"}</TableCell>
+                        <TableCell className="text-[12px] text-gray-500">{new Date(b.created_at).toLocaleDateString()}</TableCell>
+                        <TableCell className="text-right font-mono text-[13px] font-semibold text-gray-900 dark:text-gray-100">
+                          {selectedSupplier?.currency} {b.total_cost.toLocaleString()}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

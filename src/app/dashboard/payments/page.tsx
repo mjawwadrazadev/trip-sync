@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Wallet, Coins, Loader2 } from "lucide-react";
+import { Plus, Wallet, Coins, Loader2, Printer } from "lucide-react";
 
 interface Payment {
   _id: string;
@@ -278,11 +278,16 @@ export default function PaymentsPage() {
                       <TableCell><span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${statusStyles[p.status] || ""}`}>{p.status}</span></TableCell>
                       <TableCell className="text-[13px] text-gray-500">{new Date(p.created_at).toLocaleDateString()}</TableCell>
                       <TableCell>
-                        {p.status === "Posted" && p.unallocated_amount > 0 && (
-                          <Button size="sm" variant="outline" className="h-8 gap-1.5 text-[12px] cursor-pointer" onClick={() => startAllocation(p)}>
-                            <Coins className="h-3 w-3" /> Allocate
+                        <div className="flex gap-1.5">
+                          {p.status === "Posted" && p.unallocated_amount > 0 && (
+                            <Button size="sm" variant="outline" className="h-8 gap-1.5 text-[12px] cursor-pointer" onClick={() => startAllocation(p)}>
+                              <Coins className="h-3 w-3" /> Allocate
+                            </Button>
+                          )}
+                          <Button size="sm" variant="outline" className="h-8 gap-1.5 text-[12px]" onClick={() => window.open(`/dashboard/payments/${p._id}/print`, "_blank")}>
+                            <Printer className="h-3.5 w-3.5" /> Print Receipt
                           </Button>
-                        )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

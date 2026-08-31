@@ -77,7 +77,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     customer.current_balance += invoice.total_amount;
     await customer.save();
 
-    const creator = await User.findById(user.user_id);
+    const creator = await User.findById(invoice.created_by || user.user_id);
     const lineItems = await InvoiceLineItem.find({ invoice_id: invoice._id });
     for (const item of lineItems) {
       if (creator && creator.role === "Agent") {
@@ -86,7 +86,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         if (rateApplied !== undefined && rateApplied !== null) {
           const commission = await Commission.create({
             tenant_id: user.tenant_id,
-            agent_id: user.user_id,
+            agent_id: creator._id,
             invoice_line_item_id: item._id,
             rate_source: hasOverride ? "InvoiceOverride" : "AgentDefault",
             rate_applied: rateApplied,

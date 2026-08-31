@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { withAuth, successResponse, errorResponse } from "@/lib/api-helpers";
-import { Invoice, InvoiceLineItem, Expense, ExchangeRate, Tenant } from "@/models";
+import { Invoice, InvoiceLineItem, Expense, ExchangeRate, Tenant, Commission, User } from "@/models";
 
 // GET /api/reports/pnl - Profit & Loss report with full detail
 export async function GET(req: NextRequest) {
@@ -99,6 +99,36 @@ export async function GET(req: NextRequest) {
       });
     }
 
+    // Fetch all users with role Agent
+    const agents = await User.find({ tenant_id: user.tenant_id, role: "Agent" }).lean();
+    const agentPerformance = [];
+    for (const ag of agents) {
+      // Find posted invoices created by this agent in the date range
+      const agInvoices = invoices.filter((inv) => String(inv.created_by) === String(ag._id));
+      let agSales = 0;
+      for (const inv of agInvoices) {
+        agSales += await convertToBase(inv.total_amount, inv.currency);
+      }
+
+      // Find commissions posted for this agent in this date range
+      const agCommissions = await Commission.find({
+        tenant_id: user.tenant_id,
+        agent_id: ag._id,
+        status: "Posted",
+        created_at: dateFilter,
+      }).lean();
+      const agCommTotal = agCommissions.reduce((sum, comm) => sum + comm.amount, 0);
+
+      agentPerformance.push({
+        id: String(ag._id),
+        name: ag.name,
+        email: ag.email,
+        sales: Math.round(agSales * 100) / 100,
+        commission: Math.round(agCommTotal * 100) / 100,
+        invoice_count: agInvoices.length,
+      });
+    }
+
     return successResponse({
       period: { from, to },
       base_currency: tenant.base_currency,
@@ -112,6 +142,7 @@ export async function GET(req: NextRequest) {
       revenue_by_type: Object.fromEntries(
         Object.entries(revenueByType).map(([k, v]) => [k, Math.round(v * 100) / 100])
       ),
+      agent_performance: agentPerformance,
     });
   });
 }
