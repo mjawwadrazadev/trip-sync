@@ -227,17 +227,16 @@ function renderNavItem(item: (typeof navItems)[number], pathname: string, search
   const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
   const activeType = searchParams.get("type");
 
+  // Parent link style: always use full active pill (same as Customers, Dashboard etc.)
+  const parentClass = isActive
+    ? "bg-[#1a1a1d] text-white shadow-sm"
+    : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#1a1a1d] hover:text-gray-900 dark:hover:text-gray-200";
+
   return (
     <div key={item.href} className="space-y-1">
       <Link
         href={item.href}
-        className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all ${
-          isActive && !activeType && !item.children
-            ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
-            : isActive
-            ? "bg-primary/5 text-gray-900 dark:text-gray-100"
-            : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#1a1a1d] hover:text-gray-900 dark:hover:text-gray-200"
-        }`}
+        className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all ${parentClass}`}
       >
         <Icon className="h-[18px] w-[18px] flex-shrink-0" strokeWidth={isActive ? 2 : 1.7} />
         <span>{item.label}</span>
@@ -245,17 +244,17 @@ function renderNavItem(item: (typeof navItems)[number], pathname: string, search
       </Link>
 
       {item.children && isActive && (
-        <div className="pl-6 space-y-1.5 mt-1.5 border-l border-gray-100 dark:border-[#1e1e21] ml-[21px]">
+        <div className="pl-2 space-y-0.5 mt-0.5">
           {item.children.map((child) => {
             const isChildActive = child.type ? activeType === child.type : !activeType;
             return (
               <Link
                 key={child.href}
                 href={child.href}
-                className={`block py-1 px-3 text-[12px] font-medium rounded-lg transition-all ${
+                className={`flex items-center py-2 px-3 text-[12.5px] font-medium rounded-lg transition-all ${
                   isChildActive
-                    ? "text-gray-900 dark:text-gray-100 font-semibold bg-primary/5 dark:bg-primary/10"
-                    : "text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-gray-200"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-[#1a1a1d] hover:text-gray-900 dark:hover:text-gray-200"
                 }`}
               >
                 {child.label}
