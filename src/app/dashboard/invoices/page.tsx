@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Send, Ban, CreditCard, Trash2, History, Loader2 } from "lucide-react";
+import { Plus, Send, Ban, CreditCard, Trash2, History, Loader2, Pencil, Printer } from "lucide-react";
 
 interface Invoice {
   _id: string;
@@ -66,6 +66,15 @@ export default function InvoicesPage() {
   const [auditDialogInvoice, setAuditDialogInvoice] = useState<Invoice | null>(null);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
+
+  // Edit state
+  const [editInvoiceId, setEditInvoiceId] = useState<string | null>(null);
+  const [editLoading, setEditLoading] = useState(false);
+  const [editCustomerId, setEditCustomerId] = useState("");
+  const [editCurrency, setEditCurrency] = useState("PKR");
+  const [editBsp, setEditBsp] = useState(false);
+  const [editBspBillingPeriod, setEditBspBillingPeriod] = useState("");
+  const [editLineItems, setEditLineItems] = useState<LineItemInput[]>([]);
 
   const loadAuditLogs = async (invoice: Invoice) => {
     setAuditDialogInvoice(invoice);
@@ -146,6 +155,49 @@ export default function InvoicesPage() {
 
   function updateLineItem(index: number, field: keyof LineItemInput, value: string) {
     const updated = [...lineItems]; updated[index][field] = value; setLineItems(updated);
+  }
+
+  function updateEditLineItem(index: number, field: keyof LineItemInput, value: string) {
+    const updated = [...editLineItems]; updated[index][field] = value; setEditLineItems(updated);
+  }
+
+  async function openEditDialog(inv: Invoice) {
+    setEditInvoiceId(inv._id);
+    setEditLoading(true);
+    const res = await fetch(`/api/invoices/${inv._id}`);
+    const data = await res.json();
+    const customerId = typeof inv.customer_id === "object" ? inv.customer_id._id : inv.customer_id;
+    setEditCustomerId(customerId);
+    setEditCurrency(inv.currency);
+    setEditBsp(inv.bsp_flag);
+    setEditBspBillingPeriod("");
+    const items: LineItemInput[] = (data.line_items || []).map((li: { service_type: string; description: string; amount: number; commission_override_rate: number | null; tax_code_id: { _id?: string } | string | null }) => ({
+      service_type: li.service_type,
+      description: li.description || "",
+      amount: String(li.amount),
+      commission_override_rate: li.commission_override_rate ? String(li.commission_override_rate) : "",
+      tax_code_id: li.tax_code_id ? (typeof li.tax_code_id === "object" ? (li.tax_code_id as { _id?: string })._id || "" : String(li.tax_code_id)) : "",
+    }));
+    setEditLineItems(items.length > 0 ? items : [{ service_type: "Ticket", description: "", amount: "", commission_override_rate: "", tax_code_id: "" }]);
+    setEditLoading(false);
+  }
+
+  async function saveEditInvoice() {
+    if (!editInvoiceId) return;
+    const res = await fetch(`/api/invoices/${editInvoiceId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        customer_id: editCustomerId,
+        currency: editCurrency,
+        bsp_flag: editBsp,
+        bsp_billing_period: editBspBillingPeriod || null,
+        line_items: editLineItems,
+      }),
+    });
+    if (!res.ok) { const d = await res.json(); alert(d.error || "Failed to save"); return; }
+    setEditInvoiceId(null);
+    loadInvoices();
   }
 
   const statusStyles: Record<string, string> = {
@@ -326,11 +378,16 @@ export default function InvoicesPage() {
                       <TableCell>{inv.bsp_flag ? <Badge variant="outline" className="text-[10px] font-medium">BSP</Badge> : ""}</TableCell>
                       <TableCell className="text-[13px] text-gray-500">{new Date(inv.created_at).toLocaleDateString()}</TableCell>
                       <TableCell>
-                        <div className="flex gap-1.5">
+                        <div className="flex gap-1.5 flex-wrap">
                           {inv.status === "Draft" && (
-                            <Button size="sm" variant="outline" className="h-8 gap-1.5 text-[12px]" onClick={() => postInvoice(inv._id)}>
-                              <Send className="h-3 w-3" /> Post
-                            </Button>
+                            <>
+                              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-[12px]" onClick={() => postInvoice(inv._id)}>
+                                <Send className="h-3 w-3" /> Post
+                              </Button>
+                              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-[12px]" onClick={() => openEditDialog(inv)}>
+                                <Pencil className="h-3 w-3" /> Edit
+                              </Button>
+                            </>
                           )}
                           {inv.status === "Posted" && (
                             <>
@@ -342,6 +399,9 @@ export default function InvoicesPage() {
                               </Button>
                             </>
                           )}
+                          <Button size="sm" variant="outline" className="h-8 gap-1.5 text-[12px]" onClick={() => window.open(`/dashboard/invoices/${inv._id}/print`, "_blank")}>
+                            <Printer className="h-3 w-3" /> Print
+                          </Button>
                           {isManager && (
                             <Button size="sm" variant="outline" className="h-8 gap-1.5 text-[12px] cursor-pointer" onClick={() => loadAuditLogs(inv)}>
                               <History className="h-3 w-3" /> Logs
@@ -357,6 +417,94 @@ export default function InvoicesPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Edit Invoice Dialog */}
+      <Dialog open={!!editInvoiceId} onOpenChange={(open) => !open && setEditInvoiceId(null)}>
+        <DialogContent className="max-w-xl w-full">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold">Edit Invoice</DialogTitle>
+          </DialogHeader>
+          {editLoading ? (
+            <div className="flex items-center justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+          ) : (
+            <div className="space-y-5 pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-[13px]">Customer</Label>
+                  <Select value={editCustomerId} onValueChange={(v) => v && setEditCustomerId(v)}>
+                    <SelectTrigger className="h-10"><SelectValue placeholder="Select customer" /></SelectTrigger>
+                    <SelectContent>{customers.map((c) => (<SelectItem key={c._id} value={c._id}>{c.name}</SelectItem>))}</SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[13px]">Currency</Label>
+                  <Select value={editCurrency} onValueChange={(v) => v && setEditCurrency(v)}>
+                    <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                    <SelectContent>{["PKR", "USD", "GBP", "SAR", "AED"].map((c) => (<SelectItem key={c} value={c}>{c}</SelectItem>))}</SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <label className="flex items-center gap-2.5 cursor-pointer">
+                <input type="checkbox" checked={editBsp} onChange={(e) => setEditBsp(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" />
+                <span className="text-[13px] font-medium text-gray-700 dark:text-gray-300">BSP Transaction</span>
+              </label>
+
+              <div>
+                <Label className="text-[13px] mb-3 block">Line Items</Label>
+                <div className="space-y-3">
+                  {editLineItems.map((li, i) => (
+                    <div key={i} className="rounded-xl border border-gray-200/60 dark:border-[#1e1e21] p-3 space-y-2.5 bg-gray-50/40 dark:bg-[#0e0e10]/30">
+                      <div className="flex gap-2 items-center">
+                        <Select value={li.service_type} onValueChange={(v) => v && updateEditLineItem(i, "service_type", v)}>
+                          <SelectTrigger className="h-9 text-[13px] w-[130px] flex-shrink-0"><SelectValue /></SelectTrigger>
+                          <SelectContent>{["Ticket", "Hotel", "Package", "Umrah", "Visa", "Other"].map((t) => (<SelectItem key={t} value={t}>{t}</SelectItem>))}</SelectContent>
+                        </Select>
+                        <Input placeholder="Description" value={li.description} onChange={(e) => updateEditLineItem(i, "description", e.target.value)} className="h-9 text-[13px] flex-1" />
+                        {editLineItems.length > 1 && (
+                          <button onClick={() => setEditLineItems(editLineItems.filter((_, idx) => idx !== i))} className="h-9 w-9 flex-shrink-0 flex items-center justify-center rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 text-gray-400 hover:text-red-500 transition-colors">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide block mb-1">Amount</span>
+                          <Input placeholder="0" type="number" value={li.amount} onChange={(e) => updateEditLineItem(i, "amount", e.target.value)} className="h-9 text-[13px] font-mono w-full" />
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide block mb-1">Comm %</span>
+                          <Input placeholder="Default" type="number" value={li.commission_override_rate} onChange={(e) => updateEditLineItem(i, "commission_override_rate", e.target.value)} className="h-9 text-[13px] font-mono w-full" />
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide block mb-1">Tax</span>
+                          <Select value={li.tax_code_id || "none"} onValueChange={(v) => updateEditLineItem(i, "tax_code_id", v === "none" ? "" : (v || ""))}>
+                            <SelectTrigger className="h-9 text-[13px] w-full"><SelectValue placeholder="No Tax" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">No Tax</SelectItem>
+                              {taxCodes.map((tc) => (<SelectItem key={tc._id} value={tc._id}>{tc.code} ({tc.rate}%)</SelectItem>))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <Button variant="outline" size="sm" className="mt-3 gap-1.5 text-[12px]" onClick={() => setEditLineItems([...editLineItems, { service_type: "Ticket", description: "", amount: "", commission_override_rate: "", tax_code_id: "" }])}>
+                  <Plus className="h-3 w-3" /> Add Line
+                </Button>
+              </div>
+
+              <div className="flex gap-3 pt-2 border-t border-gray-100 dark:border-[#1e1e21]">
+                <Button variant="outline" className="flex-1" onClick={() => setEditInvoiceId(null)}>Cancel</Button>
+                <Button className="flex-1 gap-2" onClick={saveEditInvoice}>
+                  Save Changes
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Void Dialog */}
       <Dialog open={!!voidDialog} onOpenChange={() => setVoidDialog(null)}>

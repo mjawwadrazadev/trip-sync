@@ -68,6 +68,7 @@ const navItems: NavItem[] = [
   { href: "/dashboard/tax-codes", label: "Tax Codes", icon: Landmark },
   { href: "/dashboard/reports", label: "Reports", icon: BarChart3 },
   { href: "/dashboard/agents", label: "Team & Agents", icon: UserCheck },
+  { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {

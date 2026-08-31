@@ -13,6 +13,13 @@ export interface ITenant extends Document {
   contact_email: string;
   contact_phone: string;
   notes: string;
+  // Branding / invoice fields
+  logo_url: string;
+  address: string;
+  city: string;
+  website: string;
+  tagline: string;
+  invoice_notes: string;
   created_at: Date;
   updated_at: Date;
 }
@@ -29,6 +36,12 @@ const TenantSchema = new Schema<ITenant>(
     contact_email: { type: String, default: "" },
     contact_phone: { type: String, default: "" },
     notes: { type: String, default: "" },
+    logo_url: { type: String, default: "" },
+    address: { type: String, default: "" },
+    city: { type: String, default: "" },
+    website: { type: String, default: "" },
+    tagline: { type: String, default: "" },
+    invoice_notes: { type: String, default: "" },
   },
   { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } }
 );
