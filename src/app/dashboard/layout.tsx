@@ -2,7 +2,7 @@
 
 import { useSession, signOut } from "next-auth/react";
 import { useRouter, usePathname } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -12,6 +12,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
 import {
   LayoutDashboard,
   FileText,
@@ -25,6 +27,7 @@ import {
   LogOut,
   Settings,
   ChevronRight,
+  Menu,
 } from "lucide-react";
 
 const navItems = [
@@ -43,10 +46,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { data: session, status } = useSession();
   const router = useRouter();
   const pathname = usePathname();
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
   }, [status, router]);
+
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
 
   if (status === "loading") {
     return (
@@ -66,10 +74,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const user = session.user;
   const initials = user.name?.split(" ").map((n) => n[0]).join("") || "U";
 
-  return (
-    <div className="flex min-h-screen bg-[#f8f9fb] dark:bg-[#0a0a0b]">
-      {/* Sidebar */}
-      <aside className="w-[260px] bg-white dark:bg-[#111113] border-r border-gray-200/80 dark:border-[#1e1e21] flex flex-col fixed inset-y-0 left-0 z-30">
+  function renderSidebar() {
+    return (
+      <>
         {/* Logo */}
         <div className="px-5 h-16 flex items-center gap-2.5 border-b border-gray-200/80 dark:border-[#1e1e21]">
           <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-sm">
@@ -126,11 +133,41 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+      </>
+    );
+  }
+
+  return (
+    <div className="flex flex-col lg:flex-row min-h-screen bg-[#f8f9fb] dark:bg-[#0a0a0b]">
+      {/* Mobile Header */}
+      <header className="sticky top-0 z-20 flex lg:hidden items-center justify-between px-4 h-16 border-b border-gray-200/80 dark:border-[#1e1e21] bg-white dark:bg-[#111113] w-full">
+        <div className="flex items-center gap-2.5">
+          <Sheet open={open} onOpenChange={setOpen}>
+            <SheetTrigger render={<Button variant="ghost" size="icon" className="-ml-2 h-9 w-9 text-gray-500 dark:text-gray-400" />}>
+              <Menu className="h-5 w-5" />
+            </SheetTrigger>
+            <SheetContent side="left" className="w-[260px] p-0 border-none bg-transparent">
+              <aside className="w-[260px] h-full bg-white dark:bg-[#111113] border-r border-gray-200/80 dark:border-[#1e1e21] flex flex-col">
+                {renderSidebar()}
+              </aside>
+            </SheetContent>
+          </Sheet>
+          <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-sm">
+            <span className="text-primary-foreground font-bold text-sm tracking-tight">TS</span>
+          </div>
+          <span className="text-sm font-semibold tracking-tight text-gray-900 dark:text-gray-50">TripSync</span>
+        </div>
+        <ThemeToggle />
+      </header>
+
+      {/* Desktop Sidebar */}
+      <aside className="w-[260px] bg-white dark:bg-[#111113] border-r border-gray-200/80 dark:border-[#1e1e21] hidden lg:flex flex-col fixed inset-y-0 left-0 z-30">
+        {renderSidebar()}
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 ml-[260px] min-h-screen">
-        <div className="max-w-[1400px] mx-auto p-8">
+      <main className="flex-1 lg:ml-[260px] min-h-screen">
+        <div className="max-w-[1400px] mx-auto p-4 md:p-8">
           {children}
         </div>
       </main>

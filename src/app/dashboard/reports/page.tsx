@@ -67,10 +67,10 @@ export default function ReportsPage() {
           <Card className="bg-white dark:bg-[#111113] border-gray-200/80 dark:border-[#1e1e21] shadow-sm">
             <CardHeader className="px-6 pt-5 pb-3"><CardTitle className="text-[15px] font-semibold text-gray-900 dark:text-gray-50">Profit & Loss Report</CardTitle></CardHeader>
             <CardContent className="px-6 pb-6">
-              <div className="flex gap-4 items-end mb-6">
-                <div className="space-y-1.5"><Label className="text-[13px]">From</Label><Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="h-10" /></div>
-                <div className="space-y-1.5"><Label className="text-[13px]">To</Label><Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="h-10" /></div>
-                <Button onClick={loadPnl} disabled={loadingPnl} className="h-10 gap-2">
+              <div className="flex flex-col sm:flex-row gap-4 sm:items-end mb-6">
+                <div className="space-y-1.5 w-full sm:w-auto"><Label className="text-[13px]">From</Label><Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="h-10 w-full" /></div>
+                <div className="space-y-1.5 w-full sm:w-auto"><Label className="text-[13px]">To</Label><Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="h-10 w-full" /></div>
+                <Button onClick={loadPnl} disabled={loadingPnl} className="h-10 gap-2 w-full sm:w-auto">
                   {loadingPnl ? <Loader2 className="h-4 w-4 animate-spin" /> : <BarChart3 className="h-4 w-4" />}
                   Generate
                 </Button>
@@ -79,7 +79,7 @@ export default function ReportsPage() {
               {pnl && (
                 <div className="space-y-5">
                   <p className="text-[12px] text-gray-400 dark:text-gray-500 font-medium">All amounts in {pnl.base_currency} (converted at current exchange rates)</p>
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="p-5 rounded-xl bg-emerald-50 dark:bg-emerald-500/5 border border-emerald-100 dark:border-emerald-500/10">
                       <div className="flex items-center gap-2 mb-2">
                         <TrendingUp className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />

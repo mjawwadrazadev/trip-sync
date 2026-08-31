@@ -66,7 +66,7 @@ export default function CustomersPage() {
             <DialogHeader><DialogTitle className="text-lg font-semibold">Add Customer</DialogTitle></DialogHeader>
             <div className="space-y-4 pt-2">
               <div className="space-y-1.5"><Label className="text-[13px]">Name</Label><Input value={name} onChange={(e) => setName(e.target.value)} className="h-10" placeholder="Customer name" /></div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5"><Label className="text-[13px]">Phone</Label><Input value={phone} onChange={(e) => setPhone(e.target.value)} className="h-10" placeholder="Phone number" /></div>
                 <div className="space-y-1.5"><Label className="text-[13px]">Email</Label><Input value={email} onChange={(e) => setEmail(e.target.value)} className="h-10" placeholder="Email address" /></div>
               </div>

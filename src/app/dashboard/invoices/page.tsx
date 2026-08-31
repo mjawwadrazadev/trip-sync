@@ -114,7 +114,7 @@ export default function InvoicesPage() {
               <DialogTitle className="text-lg font-semibold">Create Invoice</DialogTitle>
             </DialogHeader>
             <div className="space-y-5 pt-2">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label className="text-[13px]">Customer</Label>
                   <Select value={newCustomerId} onValueChange={(v) => v && setNewCustomerId(v)}>
@@ -138,19 +138,31 @@ export default function InvoicesPage() {
 
               <div>
                 <Label className="text-[13px] mb-3 block">Line Items</Label>
-                <div className="space-y-2">
+                <div className="space-y-3 sm:space-y-2">
                   {lineItems.map((li, i) => (
-                    <div key={i} className="grid grid-cols-[140px_1fr_120px_36px] gap-2 items-center">
-                      <Select value={li.service_type} onValueChange={(v) => v && updateLineItem(i, "service_type", v)}>
-                        <SelectTrigger className="h-9 text-[13px]"><SelectValue /></SelectTrigger>
-                        <SelectContent>{["Ticket", "Hotel", "Package", "Umrah", "Visa", "Other"].map((t) => (<SelectItem key={t} value={t}>{t}</SelectItem>))}</SelectContent>
-                      </Select>
-                      <Input placeholder="Description" value={li.description} onChange={(e) => updateLineItem(i, "description", e.target.value)} className="h-9 text-[13px]" />
-                      <Input placeholder="Amount" type="number" value={li.amount} onChange={(e) => updateLineItem(i, "amount", e.target.value)} className="h-9 text-[13px] font-mono" />
+                    <div key={i} className="flex flex-col sm:grid sm:grid-cols-[140px_1fr_120px_36px] gap-2.5 sm:gap-2 p-3 sm:p-0 rounded-xl border border-gray-200/60 dark:border-[#1e1e21] sm:border-none bg-gray-50/40 dark:bg-[#0e0e10]/30 sm:bg-transparent items-stretch sm:items-center">
+                      <div className="flex gap-2 items-center sm:block">
+                        <span className="text-[11px] font-semibold text-gray-400 uppercase sm:hidden w-[80px] flex-shrink-0">Service</span>
+                        <Select value={li.service_type} onValueChange={(v) => v && updateLineItem(i, "service_type", v)}>
+                          <SelectTrigger className="h-9 text-[13px] flex-1 sm:w-full"><SelectValue /></SelectTrigger>
+                          <SelectContent>{["Ticket", "Hotel", "Package", "Umrah", "Visa", "Other"].map((t) => (<SelectItem key={t} value={t}>{t}</SelectItem>))}</SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex gap-2 items-center sm:block">
+                        <span className="text-[11px] font-semibold text-gray-400 uppercase sm:hidden w-[80px] flex-shrink-0">Detail</span>
+                        <Input placeholder="Description" value={li.description} onChange={(e) => updateLineItem(i, "description", e.target.value)} className="h-9 text-[13px] flex-1 sm:w-full" />
+                      </div>
+                      <div className="flex gap-2 items-center sm:block">
+                        <span className="text-[11px] font-semibold text-gray-400 uppercase sm:hidden w-[80px] flex-shrink-0">Amount</span>
+                        <Input placeholder="Amount" type="number" value={li.amount} onChange={(e) => updateLineItem(i, "amount", e.target.value)} className="h-9 text-[13px] font-mono flex-1 sm:w-full" />
+                      </div>
                       {lineItems.length > 1 && (
-                        <button onClick={() => setLineItems(lineItems.filter((_, idx) => idx !== i))} className="h-9 w-9 flex items-center justify-center rounded-md hover:bg-red-50 dark:hover:bg-red-500/10 text-gray-400 hover:text-red-500 transition-colors">
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                        <div className="flex justify-end sm:block">
+                          <button onClick={() => setLineItems(lineItems.filter((_, idx) => idx !== i))} className="h-9 px-3 sm:px-0 sm:w-9 flex items-center justify-center gap-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 text-gray-400 hover:text-red-500 transition-colors border border-gray-200 sm:border-none w-full sm:w-auto">
+                            <Trash2 className="h-3.5 w-3.5" />
+                            <span className="text-[12px] font-medium sm:hidden">Remove Line</span>
+                          </button>
+                        </div>
                       )}
                     </div>
                   ))}

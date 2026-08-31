@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Building2, Users, AlertTriangle, CheckCircle } from "lucide-react";
+import { Building2, AlertTriangle, CheckCircle } from "lucide-react";
 
 interface Stats {
   total: number;

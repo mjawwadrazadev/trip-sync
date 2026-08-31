@@ -140,8 +140,8 @@ export default function AgenciesPage() {
               {/* Agency Info */}
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 mb-3">Agency Information</p>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2 space-y-1.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="sm:col-span-2 space-y-1.5">
                     <Label className="text-[13px]">Agency Name *</Label>
                     <Input value={form.agency_name} onChange={(e) => updateForm("agency_name", e.target.value)} className="h-10" placeholder="e.g. Karachi Travels" />
                   </div>
@@ -170,7 +170,7 @@ export default function AgenciesPage() {
               {/* Contact Info */}
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 mb-3">Contact Details</p>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="space-y-1.5"><Label className="text-[13px]">Contact Person</Label><Input value={form.contact_person} onChange={(e) => updateForm("contact_person", e.target.value)} className="h-10" /></div>
                   <div className="space-y-1.5"><Label className="text-[13px]">Email</Label><Input value={form.contact_email} onChange={(e) => updateForm("contact_email", e.target.value)} className="h-10" /></div>
                   <div className="space-y-1.5"><Label className="text-[13px]">Phone</Label><Input value={form.contact_phone} onChange={(e) => updateForm("contact_phone", e.target.value)} className="h-10" /></div>
@@ -180,7 +180,7 @@ export default function AgenciesPage() {
               {/* Owner Account */}
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 mb-3">Owner Account (Login Credentials)</p>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="space-y-1.5"><Label className="text-[13px]">Owner Name *</Label><Input value={form.owner_name} onChange={(e) => updateForm("owner_name", e.target.value)} className="h-10" /></div>
                   <div className="space-y-1.5"><Label className="text-[13px]">Owner Email *</Label><Input value={form.owner_email} onChange={(e) => updateForm("owner_email", e.target.value)} className="h-10" /></div>
                   <div className="space-y-1.5"><Label className="text-[13px]">Password *</Label><Input value={form.owner_password} onChange={(e) => updateForm("owner_password", e.target.value)} className="h-10 font-mono" /></div>
@@ -337,7 +337,7 @@ export default function AgenciesPage() {
           <DialogHeader><DialogTitle className="text-lg font-semibold">Agency Details</DialogTitle></DialogHeader>
           {detailData && (
             <div className="space-y-5 pt-2">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {[
                   ["Name", (detailData.agency as Record<string, unknown>)?.name],
                   ["Status", (detailData.agency as Record<string, unknown>)?.status],

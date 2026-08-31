@@ -70,7 +70,7 @@ export default function PaymentsPage() {
                   <SelectContent>{customers.map((c) => <SelectItem key={c._id} value={c._id}>{c.name}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5"><Label className="text-[13px]">Amount</Label><Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="h-10 font-mono" placeholder="0" /></div>
                 <div className="space-y-1.5">
                   <Label className="text-[13px]">Currency</Label>
