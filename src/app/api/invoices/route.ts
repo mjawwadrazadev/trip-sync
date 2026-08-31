@@ -9,12 +9,21 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
     const customer_id = searchParams.get("customer_id");
+    const service_type = searchParams.get("type");
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
 
     const filter: Record<string, unknown> = { tenant_id: user.tenant_id };
     if (status) filter.status = status;
     if (customer_id) filter.customer_id = customer_id;
+
+    if (service_type) {
+      const matchingLineItems = await InvoiceLineItem.find({ tenant_id: user.tenant_id, service_type })
+        .select("invoice_id")
+        .lean();
+      const invoiceIds = matchingLineItems.map((li) => li.invoice_id);
+      filter._id = { $in: invoiceIds };
+    }
 
     const [invoices, total] = await Promise.all([
       Invoice.find(filter)

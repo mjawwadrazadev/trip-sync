@@ -1,8 +1,8 @@
 "use client";
 
 import { useSession, signOut } from "next-auth/react";
-import { useRouter, usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -31,9 +31,35 @@ import {
   UserCheck,
 } from "lucide-react";
 
-const navItems = [
+interface NavChild {
+  href: string;
+  label: string;
+  type: string | null;
+}
+
+interface NavItem {
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  children?: NavChild[];
+}
+
+const navItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/dashboard/invoices", label: "Invoices", icon: FileText },
+  {
+    href: "/dashboard/invoices",
+    label: "Invoices",
+    icon: FileText,
+    children: [
+      { href: "/dashboard/invoices", label: "All Invoices", type: null },
+      { href: "/dashboard/invoices?type=Ticket", label: "Tickets", type: "Ticket" },
+      { href: "/dashboard/invoices?type=Hotel", label: "Hotels", type: "Hotel" },
+      { href: "/dashboard/invoices?type=Package", label: "Packages", type: "Package" },
+      { href: "/dashboard/invoices?type=Umrah", label: "Umrah", type: "Umrah" },
+      { href: "/dashboard/invoices?type=Visa", label: "Visas", type: "Visa" },
+      { href: "/dashboard/invoices?type=Other", label: "Others", type: "Other" },
+    ],
+  },
   { href: "/dashboard/customers", label: "Customers", icon: Users },
   { href: "/dashboard/payments", label: "Payments", icon: Wallet },
   { href: "/dashboard/expenses", label: "Expenses", icon: Receipt },
@@ -91,19 +117,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-          <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Menu</p>
-          {navItems.slice(0, 1).map((item) => renderNavItem(item, pathname))}
-
-          <div className="pt-4 pb-1">
-            <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Finance</p>
-          </div>
-          {navItems.slice(1, 5).map((item) => renderNavItem(item, pathname))}
-
-          <div className="pt-4 pb-1">
-            <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Management</p>
-          </div>
-          {navItems.slice(5).map((item) => renderNavItem(item, pathname))}
+        <nav className="flex-1 px-3 py-4 overflow-y-auto">
+          <Suspense fallback={<div className="text-xs text-gray-400 px-3">Loading menu...</div>}>
+            <SidebarNav pathname={pathname} />
+          </Suspense>
         </nav>
 
         {/* Theme Toggle */}
@@ -177,23 +194,76 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   );
 }
 
-function renderNavItem(item: (typeof navItems)[number], pathname: string) {
+function SidebarNav({ pathname }: { pathname: string }) {
+  const searchParams = useSearchParams();
+  return (
+    <div className="flex-1 space-y-4">
+      <div>
+        <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Menu</p>
+        <div className="space-y-0.5">
+          {navItems.slice(0, 1).map((item) => renderNavItem(item, pathname, searchParams))}
+        </div>
+      </div>
+
+      <div>
+        <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Finance</p>
+        <div className="space-y-0.5">
+          {navItems.slice(1, 5).map((item) => renderNavItem(item, pathname, searchParams))}
+        </div>
+      </div>
+
+      <div>
+        <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Management</p>
+        <div className="space-y-0.5">
+          {navItems.slice(5).map((item) => renderNavItem(item, pathname, searchParams))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function renderNavItem(item: (typeof navItems)[number], pathname: string, searchParams: { get: (key: string) => string | null }) {
   const Icon = item.icon;
   const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
+  const activeType = searchParams.get("type");
 
   return (
-    <Link
-      key={item.href}
-      href={item.href}
-      className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all ${
-        isActive
-          ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
-          : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#1a1a1d] hover:text-gray-900 dark:hover:text-gray-200"
-      }`}
-    >
-      <Icon className="h-[18px] w-[18px] flex-shrink-0" strokeWidth={isActive ? 2 : 1.7} />
-      <span>{item.label}</span>
-      {isActive && <ChevronRight className="h-3.5 w-3.5 ml-auto opacity-50" />}
-    </Link>
+    <div key={item.href} className="space-y-1">
+      <Link
+        href={item.href}
+        className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all ${
+          isActive && !activeType && !item.children
+            ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
+            : isActive
+            ? "bg-primary/5 text-primary dark:text-primary-foreground"
+            : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#1a1a1d] hover:text-gray-900 dark:hover:text-gray-200"
+        }`}
+      >
+        <Icon className="h-[18px] w-[18px] flex-shrink-0" strokeWidth={isActive ? 2 : 1.7} />
+        <span>{item.label}</span>
+        {isActive && !item.children && <ChevronRight className="h-3.5 w-3.5 ml-auto opacity-50" />}
+      </Link>
+
+      {item.children && isActive && (
+        <div className="pl-6 space-y-1.5 mt-1.5 border-l border-gray-100 dark:border-[#1e1e21] ml-[21px]">
+          {item.children.map((child) => {
+            const isChildActive = child.type ? activeType === child.type : !activeType;
+            return (
+              <Link
+                key={child.href}
+                href={child.href}
+                className={`block py-1 px-3 text-[12px] font-medium rounded-lg transition-all ${
+                  isChildActive
+                    ? "text-primary dark:text-primary-foreground font-semibold bg-primary/5 dark:bg-primary/10"
+                    : "text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-gray-200"
+                }`}
+              >
+                {child.label}
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }

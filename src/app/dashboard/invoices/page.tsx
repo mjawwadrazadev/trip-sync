@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
+import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -25,7 +26,8 @@ interface Invoice {
 }
 
 interface Customer { _id: string; name: string; }
-interface LineItemInput { service_type: string; description: string; amount: string; commission_override_rate: string; }
+interface LineItemInput { service_type: string; description: string; amount: string; commission_override_rate: string; tax_code_id: string; }
+interface TaxCode { _id: string; code: string; rate: number; active: boolean; }
 
 interface AuditLogEntry {
   _id: string;
@@ -38,8 +40,12 @@ interface AuditLogEntry {
 
 export default function InvoicesPage() {
   const { data: session } = useSession();
+  const searchParams = useSearchParams();
+  const typeFilter = searchParams.get("type");
+
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [taxCodes, setTaxCodes] = useState<TaxCode[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
   const [voidDialog, setVoidDialog] = useState<string | null>(null);
@@ -52,7 +58,7 @@ export default function InvoicesPage() {
   const [newBsp, setNewBsp] = useState(false);
   const [newBspBillingPeriod, setNewBspBillingPeriod] = useState("");
   const [lineItems, setLineItems] = useState<LineItemInput[]>([
-    { service_type: "Ticket", description: "", amount: "", commission_override_rate: "" },
+    { service_type: "Ticket", description: "", amount: "", commission_override_rate: "", tax_code_id: "" },
   ]);
 
   // Audit Logs state
@@ -77,15 +83,18 @@ export default function InvoicesPage() {
   const isManager = ["Owner", "Accountant"].includes((session?.user as { role?: string })?.role || "");
 
   const loadInvoices = useCallback(async () => {
-    const res = await fetch("/api/invoices");
+    setLoading(true);
+    const url = typeFilter ? `/api/invoices?type=${typeFilter}` : "/api/invoices";
+    const res = await fetch(url);
     const data = await res.json();
     setInvoices(data.invoices || []);
     setLoading(false);
-  }, []);
+  }, [typeFilter]);
 
   useEffect(() => {
     loadInvoices();
     fetch("/api/customers").then((r) => r.json()).then((d) => setCustomers(d.customers || []));
+    fetch("/api/tax-codes").then((r) => r.json()).then((d) => setTaxCodes((d.tax_codes || []).filter((tc: TaxCode) => tc.active)));
   }, [loadInvoices]);
 
   async function createInvoice() {
@@ -99,13 +108,14 @@ export default function InvoicesPage() {
           service_type: li.service_type,
           description: li.description,
           amount: parseFloat(li.amount) || 0,
-          commission_override_rate: li.commission_override_rate !== "" ? parseFloat(li.commission_override_rate) : null
+          commission_override_rate: li.commission_override_rate !== "" ? parseFloat(li.commission_override_rate) : null,
+          tax_code_id: li.tax_code_id !== "" ? li.tax_code_id : null,
         })),
       }),
     });
     if (res.ok) {
       setShowNew(false);
-      setLineItems([{ service_type: "Ticket", description: "", amount: "", commission_override_rate: "" }]);
+      setLineItems([{ service_type: "Ticket", description: "", amount: "", commission_override_rate: "", tax_code_id: "" }]);
       setNewCustomerId("");
       setNewBspBillingPeriod("");
       loadInvoices();
@@ -147,7 +157,7 @@ export default function InvoicesPage() {
     <div>
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-50">Invoices</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-50">Invoices{typeFilter ? ` — ${typeFilter}s` : ""}</h1>
           <p className="text-[13px] text-gray-500 dark:text-gray-400 mt-1">Manage your invoices and billing</p>
         </div>
         <Dialog open={showNew} onOpenChange={setShowNew}>
@@ -193,7 +203,7 @@ export default function InvoicesPage() {
                 <Label className="text-[13px] mb-3 block">Line Items</Label>
                 <div className="space-y-3 sm:space-y-2">
                   {lineItems.map((li, i) => (
-                    <div key={i} className="flex flex-col sm:grid sm:grid-cols-[130px_1fr_110px_90px_36px] gap-2.5 sm:gap-2 p-3 sm:p-0 rounded-xl border border-gray-200/60 dark:border-[#1e1e21] sm:border-none bg-gray-50/40 dark:bg-[#0e0e10]/30 sm:bg-transparent items-stretch sm:items-center">
+                    <div key={i} className="flex flex-col sm:grid sm:grid-cols-[110px_1fr_95px_75px_105px_36px] gap-2.5 sm:gap-1.5 p-3 sm:p-0 rounded-xl border border-gray-200/60 dark:border-[#1e1e21] sm:border-none bg-gray-50/40 dark:bg-[#0e0e10]/30 sm:bg-transparent items-stretch sm:items-center">
                       <div className="flex gap-2 items-center sm:block">
                         <span className="text-[11px] font-semibold text-gray-400 uppercase sm:hidden w-[80px] flex-shrink-0">Service</span>
                         <Select value={li.service_type} onValueChange={(v) => v && updateLineItem(i, "service_type", v)}>
@@ -213,6 +223,22 @@ export default function InvoicesPage() {
                         <span className="text-[11px] font-semibold text-gray-400 uppercase sm:hidden w-[80px] flex-shrink-0">Comm %</span>
                         <Input placeholder="Override" type="number" value={li.commission_override_rate} onChange={(e) => updateLineItem(i, "commission_override_rate", e.target.value)} className="h-9 text-[13px] font-mono flex-1 sm:w-full" />
                       </div>
+                      <div className="flex gap-2 items-center sm:block">
+                        <span className="text-[11px] font-semibold text-gray-400 uppercase sm:hidden w-[80px] flex-shrink-0">Tax</span>
+                        <Select value={li.tax_code_id || "none"} onValueChange={(v) => updateLineItem(i, "tax_code_id", v || "")}>
+                          <SelectTrigger className="h-9 text-[13px] flex-1 sm:w-full">
+                            <SelectValue placeholder="No Tax" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">No Tax</SelectItem>
+                            {taxCodes.map((tc) => (
+                              <SelectItem key={tc._id} value={tc._id}>
+                                {tc.code} ({tc.rate}%)
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                       {lineItems.length > 1 && (
                         <div className="flex justify-end sm:block">
                           <button onClick={() => setLineItems(lineItems.filter((_, idx) => idx !== i))} className="h-9 px-3 sm:px-0 sm:w-9 flex items-center justify-center gap-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 text-gray-400 hover:text-red-500 transition-colors border border-gray-200 sm:border-none w-full sm:w-auto">
@@ -224,7 +250,7 @@ export default function InvoicesPage() {
                     </div>
                   ))}
                 </div>
-                <Button variant="outline" size="sm" className="mt-3 gap-1.5 text-[12px]" onClick={() => setLineItems([...lineItems, { service_type: "Ticket", description: "", amount: "", commission_override_rate: "" }])}>
+                <Button variant="outline" size="sm" className="mt-3 gap-1.5 text-[12px]" onClick={() => setLineItems([...lineItems, { service_type: "Ticket", description: "", amount: "", commission_override_rate: "", tax_code_id: "" }])}>
                   <Plus className="h-3 w-3" /> Add Line
                 </Button>
               </div>
