@@ -13,6 +13,16 @@ export interface IInvoice extends Document {
   booking_reference: string | null;
   bsp_flag: boolean;
   bsp_billing_period: string | null;
+  payment_mode: string;
+  remarks: string;
+  visit_type: string;
+  spo_id: Types.ObjectId | null;
+  supplier_id: Types.ObjectId | null;
+  print_name: string;
+  cost_center: string;
+  adj_date: Date | null;
+  our_xo: string;
+  client_xo: string;
   created_by: Types.ObjectId;
   updated_by: Types.ObjectId;
   created_at: Date;
@@ -31,6 +41,16 @@ const InvoiceSchema = new Schema<IInvoice>(
     booking_reference: { type: String, default: null },
     bsp_flag: { type: Boolean, default: false },
     bsp_billing_period: { type: String, default: null },
+    payment_mode: { type: String, default: "CR" },
+    remarks: { type: String, default: "NORMAL" },
+    visit_type: { type: String, default: "Visitor" },
+    spo_id: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    supplier_id: { type: Schema.Types.ObjectId, ref: "Supplier", default: null },
+    print_name: { type: String, default: "" },
+    cost_center: { type: String, default: "" },
+    adj_date: { type: Date, default: null },
+    our_xo: { type: String, default: "" },
+    client_xo: { type: String, default: "" },
     created_by: { type: Schema.Types.ObjectId, ref: "User" },
     updated_by: { type: Schema.Types.ObjectId, ref: "User" },
   },

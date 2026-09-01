@@ -2,6 +2,16 @@ import mongoose, { Schema, Document, Types } from "mongoose";
 
 export type ServiceType = "Ticket" | "Hotel" | "Package" | "Umrah" | "Visa" | "Other";
 
+export interface IFlightSegment {
+  city: string;
+  flight_no: string;
+  booking_class: string;
+  dep_date: string;
+  dep_time: string;
+  arr_time: string;
+  fare_basis: string;
+}
+
 export interface IInvoiceLineItem extends Document {
   invoice_id: Types.ObjectId;
   tenant_id: Types.ObjectId;
@@ -12,6 +22,67 @@ export interface IInvoiceLineItem extends Document {
   commission_id: Types.ObjectId | null;
   booking_reference: string | null;
   commission_override_rate: number | null;
+  
+  // Passenger & Airline Details
+  pax_name: string;
+  pax_type: string; // 'A' | 'C' | 'I'
+  passport_no: string;
+  passport_issue_date: string;
+  ticket_number: string;
+  conjunction_ticket_no: string;
+  gds_pnr: string;
+  gds_name: string;
+  airline_name: string;
+  airline_code: string;
+  sector: string;
+  trip_type: string; // 'International' | 'Domestic'
+  doc_type: string; // 'BSPD' | 'E-Ticket'
+  tour_code: string;
+  issue_date: string;
+  
+  // Flight Segments
+  flight_segments: IFlightSegment[];
+  
+  // Airfare & IATA Taxes
+  base_fare: number;
+  tax_dof: number;
+  tax_yq: number;
+  tax_yr: number;
+  tax_rg: number;
+  tax_pk: number;
+  tax_apt: number;
+  tax_kbr: number;
+  tax_kbp: number;
+  tax_pb: number;
+  tax_xz: number;
+  tax_yd: number;
+  tax_yi: number;
+  tax_rn: number;
+  tax_city: number;
+  tax_airline_city: number;
+  other_taxes: number;
+  
+  // Commercials & Deductions
+  wht_percent: number;
+  wht_amount: number;
+  commission_percent: number;
+  commission_amount: number;
+  discount_percent: number;
+  discount_amount: number;
+  psf_amount: number;
+  gst_percent: number;
+  gst_amount: number;
+  cancellation_charges_self: number;
+  cancellation_charges_supplier: number;
+  
+  // Accounting Summary
+  supplier_id: Types.ObjectId | null;
+  customer_gross: number;
+  customer_net: number;
+  supplier_gross: number;
+  supplier_net: number;
+  agency_margin: number;
+
   created_at: Date;
   updated_at: Date;
 }
@@ -27,6 +98,76 @@ const InvoiceLineItemSchema = new Schema<IInvoiceLineItem>(
     commission_id: { type: Schema.Types.ObjectId, ref: "Commission", default: null },
     booking_reference: { type: String, default: null },
     commission_override_rate: { type: Number, default: null },
+
+    // Passenger & Airline Details
+    pax_name: { type: String, default: "" },
+    pax_type: { type: String, default: "A" },
+    passport_no: { type: String, default: "" },
+    passport_issue_date: { type: String, default: "" },
+    ticket_number: { type: String, default: "" },
+    conjunction_ticket_no: { type: String, default: "" },
+    gds_pnr: { type: String, default: "" },
+    gds_name: { type: String, default: "" },
+    airline_name: { type: String, default: "" },
+    airline_code: { type: String, default: "" },
+    sector: { type: String, default: "" },
+    trip_type: { type: String, default: "International" },
+    doc_type: { type: String, default: "BSPD" },
+    tour_code: { type: String, default: "" },
+    issue_date: { type: String, default: "" },
+
+    // Flight Segments
+    flight_segments: [
+      {
+        city: { type: String, default: "" },
+        flight_no: { type: String, default: "" },
+        booking_class: { type: String, default: "" },
+        dep_date: { type: String, default: "" },
+        dep_time: { type: String, default: "" },
+        arr_time: { type: String, default: "" },
+        fare_basis: { type: String, default: "" },
+      },
+    ],
+
+    // Airfare & IATA Taxes
+    base_fare: { type: Number, default: 0 },
+    tax_dof: { type: Number, default: 0 },
+    tax_yq: { type: Number, default: 0 },
+    tax_yr: { type: Number, default: 0 },
+    tax_rg: { type: Number, default: 0 },
+    tax_pk: { type: Number, default: 0 },
+    tax_apt: { type: Number, default: 0 },
+    tax_kbr: { type: Number, default: 0 },
+    tax_kbp: { type: Number, default: 0 },
+    tax_pb: { type: Number, default: 0 },
+    tax_xz: { type: Number, default: 0 },
+    tax_yd: { type: Number, default: 0 },
+    tax_yi: { type: Number, default: 0 },
+    tax_rn: { type: Number, default: 0 },
+    tax_city: { type: Number, default: 0 },
+    tax_airline_city: { type: Number, default: 0 },
+    other_taxes: { type: Number, default: 0 },
+
+    // Commercials & Deductions
+    wht_percent: { type: Number, default: 0 },
+    wht_amount: { type: Number, default: 0 },
+    commission_percent: { type: Number, default: 0 },
+    commission_amount: { type: Number, default: 0 },
+    discount_percent: { type: Number, default: 0 },
+    discount_amount: { type: Number, default: 0 },
+    psf_amount: { type: Number, default: 0 },
+    gst_percent: { type: Number, default: 0 },
+    gst_amount: { type: Number, default: 0 },
+    cancellation_charges_self: { type: Number, default: 0 },
+    cancellation_charges_supplier: { type: Number, default: 0 },
+
+    // Accounting Summary
+    supplier_id: { type: Schema.Types.ObjectId, ref: "Supplier", default: null },
+    customer_gross: { type: Number, default: 0 },
+    customer_net: { type: Number, default: 0 },
+    supplier_gross: { type: Number, default: 0 },
+    supplier_net: { type: Number, default: 0 },
+    agency_margin: { type: Number, default: 0 },
   },
   { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } }
 );

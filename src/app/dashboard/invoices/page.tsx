@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Send, Ban, CreditCard, Trash2, History, Loader2, Pencil, Printer } from "lucide-react";
+import { Plus, Send, Ban, CreditCard, Trash2, History, Loader2, Pencil, Printer, Plane, FileText, Calculator } from "lucide-react";
 
 interface Invoice {
   _id: string;
@@ -22,12 +22,85 @@ interface Invoice {
   currency: string;
   total_amount: number;
   bsp_flag: boolean;
+  payment_mode?: string;
+  remarks?: string;
   created_at: string;
 }
 
 interface Customer { _id: string; name: string; }
-interface LineItemInput { service_type: string; description: string; amount: string; commission_override_rate: string; tax_code_id: string; }
-interface TaxCode { _id: string; code: string; rate: number; active: boolean; }
+interface Supplier { _id: string; name: string; code?: string; }
+interface UserItem { _id: string; name: string; role: string; }
+
+interface FlightSegment {
+  city: string;
+  flight_no: string;
+  booking_class: string;
+  dep_date: string;
+  dep_time: string;
+  arr_time: string;
+  fare_basis: string;
+}
+
+interface LineItemInput {
+  service_type: string;
+  description: string;
+  amount: string;
+  commission_override_rate: string;
+  tax_code_id: string;
+  
+  // Ticketing specific
+  pax_name?: string;
+  pax_type?: string;
+  passport_no?: string;
+  passport_issue_date?: string;
+  ticket_number?: string;
+  conjunction_ticket_no?: string;
+  gds_pnr?: string;
+  gds_name?: string;
+  airline_name?: string;
+  airline_code?: string;
+  sector?: string;
+  trip_type?: string;
+  doc_type?: string;
+  tour_code?: string;
+  issue_date?: string;
+  flight_segments?: FlightSegment[];
+  
+  base_fare?: string;
+  tax_dof?: string;
+  tax_yq?: string;
+  tax_yr?: string;
+  tax_rg?: string;
+  tax_pk?: string;
+  tax_apt?: string;
+  tax_kbr?: string;
+  tax_kbp?: string;
+  tax_pb?: string;
+  tax_xz?: string;
+  tax_yd?: string;
+  tax_yi?: string;
+  tax_rn?: string;
+  tax_city?: string;
+  tax_airline_city?: string;
+  other_taxes?: string;
+
+  wht_percent?: string;
+  wht_amount?: string;
+  commission_percent?: string;
+  commission_amount?: string;
+  discount_percent?: string;
+  discount_amount?: string;
+  psf_amount?: string;
+  gst_percent?: string;
+  gst_amount?: string;
+
+  supplier_id?: string;
+  customer_gross?: number;
+  customer_net?: number;
+  supplier_gross?: number;
+  supplier_net?: number;
+  agency_margin?: number;
+}
 
 interface AuditLogEntry {
   _id: string;
@@ -45,7 +118,8 @@ export default function InvoicesPage() {
 
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [taxCodes, setTaxCodes] = useState<TaxCode[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [staffUsers, setStaffUsers] = useState<UserItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
   const [voidDialog, setVoidDialog] = useState<string | null>(null);
@@ -53,13 +127,89 @@ export default function InvoicesPage() {
   const [creditDialog, setCreditDialog] = useState<string | null>(null);
   const [creditAmount, setCreditAmount] = useState("");
   const [creditReason, setCreditReason] = useState("");
+
+  // Invoice Header State
   const [newCustomerId, setNewCustomerId] = useState("");
-  const [newCurrency, setNewCurrency] = useState("PKR");
-  const [newBsp, setNewBsp] = useState(false);
-  const [newBspBillingPeriod, setNewBspBillingPeriod] = useState("");
+  const [newCurrency] = useState("PKR");
+  const [newPaymentMode, setNewPaymentMode] = useState("CR");
+  const [newRemarks, setNewRemarks] = useState("NORMAL");
+  const [newVisitType] = useState("Visitor");
+  const [newSpoId, setNewSpoId] = useState("");
+  const [newSupplierId, setNewSupplierId] = useState("");
+  const [newPrintName, setNewPrintName] = useState("");
+  const [newCostCenter] = useState("");
+  const [newInvDate, setNewInvDate] = useState(new Date().toISOString().split("T")[0]);
+  const [newAdjDate, setNewAdjDate] = useState(new Date().toISOString().split("T")[0]);
+  const [newOurXo] = useState("E");
+  const [newClientXo] = useState("");
+  const [newBsp] = useState(false);
+  const [newBspBillingPeriod] = useState("");
+
   const defaultType = (typeFilter && typeFilter !== "Other") ? typeFilter : "Ticket";
+
+  // Ticket Line item helper
+  const createDefaultTicketItem = (): LineItemInput => ({
+    service_type: "Ticket",
+    description: "",
+    amount: "0",
+    commission_override_rate: "",
+    tax_code_id: "",
+    pax_name: "",
+    pax_type: "A",
+    passport_no: "",
+    passport_issue_date: "",
+    ticket_number: "",
+    conjunction_ticket_no: "",
+    gds_pnr: "",
+    gds_name: "Amadeus",
+    airline_name: "",
+    airline_code: "",
+    sector: "",
+    trip_type: "International",
+    doc_type: "BSPD",
+    tour_code: "",
+    issue_date: new Date().toISOString().split("T")[0],
+    flight_segments: [
+      { city: "LHE", flight_no: "", booking_class: "Y", dep_date: "", dep_time: "", arr_time: "", fare_basis: "" },
+      { city: "DOH", flight_no: "", booking_class: "Y", dep_date: "", dep_time: "", arr_time: "", fare_basis: "" },
+    ],
+    base_fare: "0",
+    tax_dof: "0",
+    tax_yq: "0",
+    tax_yr: "0",
+    tax_rg: "0",
+    tax_pk: "0",
+    tax_apt: "0",
+    tax_kbr: "0",
+    tax_kbp: "0",
+    tax_pb: "0",
+    tax_xz: "0",
+    tax_yd: "0",
+    tax_yi: "0",
+    tax_rn: "0",
+    tax_city: "0",
+    tax_airline_city: "0",
+    other_taxes: "0",
+    wht_percent: "12",
+    wht_amount: "0",
+    commission_percent: "0",
+    commission_amount: "0",
+    discount_percent: "0",
+    discount_amount: "0",
+    psf_amount: "0",
+    gst_percent: "5",
+    gst_amount: "0",
+    customer_gross: 0,
+    customer_net: 0,
+    supplier_gross: 0,
+    supplier_net: 0,
+    agency_margin: 0,
+  });
+
   const [lineItems, setLineItems] = useState<LineItemInput[]>([
-    { service_type: defaultType, description: "", amount: "", commission_override_rate: "", tax_code_id: "" },
+    defaultType === "Ticket"
+      ? createDefaultTicketItem()
+      : { service_type: defaultType, description: "", amount: "", commission_override_rate: "", tax_code_id: "" },
   ]);
 
   // Audit Logs state
@@ -72,8 +222,18 @@ export default function InvoicesPage() {
   const [editLoading, setEditLoading] = useState(false);
   const [editCustomerId, setEditCustomerId] = useState("");
   const [editCurrency, setEditCurrency] = useState("PKR");
+  const [editPaymentMode, setEditPaymentMode] = useState("CR");
+  const [editRemarks, setEditRemarks] = useState("NORMAL");
+  const [editVisitType, setEditVisitType] = useState("Visitor");
+  const [editSpoId, setEditSpoId] = useState("");
+  const [editSupplierId, setEditSupplierId] = useState("");
+  const [editPrintName, setEditPrintName] = useState("");
+  const [editCostCenter, setEditCostCenter] = useState("");
+  const [editAdjDate, setEditAdjDate] = useState("");
+  const [editOurXo, setEditOurXo] = useState("");
+  const [editClientXo, setEditClientXo] = useState("");
   const [editBsp, setEditBsp] = useState(false);
-  const [editBspBillingPeriod, setEditBspBillingPeriod] = useState("");
+  const [editBspBillingPeriod] = useState("");
   const [editLineItems, setEditLineItems] = useState<LineItemInput[]>([]);
 
   const loadAuditLogs = async (invoice: Invoice) => {
@@ -104,39 +264,139 @@ export default function InvoicesPage() {
   useEffect(() => {
     loadInvoices();
     fetch("/api/customers").then((r) => r.json()).then((d) => setCustomers(d.customers || []));
-    fetch("/api/tax-codes").then((r) => r.json()).then((d) => setTaxCodes((d.tax_codes || []).filter((tc: TaxCode) => tc.active)));
+    fetch("/api/suppliers").then((r) => r.json()).then((d) => setSuppliers(d.suppliers || []));
+    fetch("/api/users").then((r) => r.json()).then((d) => setStaffUsers(d.users || []));
   }, [loadInvoices]);
+
+  // Calculations for Ticket Line Item
+  function calculateTicketTotals(item: LineItemInput): LineItemInput {
+    const baseFare = parseFloat(item.base_fare || "0") || 0;
+    const taxes = (parseFloat(item.tax_dof || "0") || 0) +
+      (parseFloat(item.tax_yq || "0") || 0) +
+      (parseFloat(item.tax_yr || "0") || 0) +
+      (parseFloat(item.tax_rg || "0") || 0) +
+      (parseFloat(item.tax_pk || "0") || 0) +
+      (parseFloat(item.tax_apt || "0") || 0) +
+      (parseFloat(item.tax_kbr || "0") || 0) +
+      (parseFloat(item.tax_kbp || "0") || 0) +
+      (parseFloat(item.tax_pb || "0") || 0) +
+      (parseFloat(item.tax_xz || "0") || 0) +
+      (parseFloat(item.tax_yd || "0") || 0) +
+      (parseFloat(item.tax_yi || "0") || 0) +
+      (parseFloat(item.tax_rn || "0") || 0) +
+      (parseFloat(item.tax_city || "0") || 0) +
+      (parseFloat(item.tax_airline_city || "0") || 0) +
+      (parseFloat(item.other_taxes || "0") || 0);
+
+    const grossFare = baseFare + taxes;
+    const commPct = parseFloat(item.commission_percent || "0") || 0;
+    const commAmt = (baseFare * commPct) / 100;
+
+    const whtPct = parseFloat(item.wht_percent || "0") || 0;
+    const whtAmt = (baseFare * whtPct) / 100;
+
+    const disPct = parseFloat(item.discount_percent || "0") || 0;
+    const disAmt = (grossFare * disPct) / 100;
+
+    const psf = parseFloat(item.psf_amount || "0") || 0;
+    const gstPct = parseFloat(item.gst_percent || "0") || 0;
+    const gstAmt = (psf * gstPct) / 100;
+
+    const customerGross = grossFare + psf;
+    const customerNet = customerGross - disAmt + gstAmt;
+
+    const supplierGross = grossFare;
+    const supplierNet = supplierGross - commAmt + whtAmt;
+
+    const margin = customerNet - supplierNet;
+
+    return {
+      ...item,
+      commission_amount: commAmt.toFixed(2),
+      wht_amount: whtAmt.toFixed(2),
+      discount_amount: disAmt.toFixed(2),
+      gst_amount: gstAmt.toFixed(2),
+      customer_gross: Math.round(customerGross),
+      customer_net: Math.round(customerNet),
+      supplier_gross: Math.round(supplierGross),
+      supplier_net: Math.round(supplierNet),
+      agency_margin: Math.round(margin),
+      amount: String(Math.round(customerNet)),
+    };
+  }
+
+  function updateTicketLineItem(index: number, field: string, value: string | number | FlightSegment[] | undefined, isEdit = false) {
+    const list = isEdit ? [...editLineItems] : [...lineItems];
+    let item = { ...list[index], [field]: value };
+    item = calculateTicketTotals(item);
+    list[index] = item;
+    if (isEdit) setEditLineItems(list);
+    else setLineItems(list);
+  }
+
+  function addFlightSegment(index: number, isEdit = false) {
+    const list = isEdit ? [...editLineItems] : [...lineItems];
+    const segs = [...(list[index].flight_segments || [])];
+    segs.push({ city: "", flight_no: "", booking_class: "Y", dep_date: "", dep_time: "", arr_time: "", fare_basis: "" });
+    list[index] = { ...list[index], flight_segments: segs };
+    if (isEdit) setEditLineItems(list);
+    else setLineItems(list);
+  }
+
+  function updateFlightSegment(lineIdx: number, segIdx: number, field: keyof FlightSegment, value: string, isEdit = false) {
+    const list = isEdit ? [...editLineItems] : [...lineItems];
+    const segs = [...(list[lineIdx].flight_segments || [])];
+    segs[segIdx] = { ...segs[segIdx], [field]: value };
+    list[lineIdx] = { ...list[lineIdx], flight_segments: segs };
+    if (isEdit) setEditLineItems(list);
+    else setLineItems(list);
+  }
+
+  function removeFlightSegment(lineIdx: number, segIdx: number, isEdit = false) {
+    const list = isEdit ? [...editLineItems] : [...lineItems];
+    const segs = (list[lineIdx].flight_segments || []).filter((_, i) => i !== segIdx);
+    list[lineIdx] = { ...list[lineIdx], flight_segments: segs };
+    if (isEdit) setEditLineItems(list);
+    else setLineItems(list);
+  }
 
   async function createInvoice() {
     const res = await fetch("/api/invoices", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        customer_id: newCustomerId, currency: newCurrency, bsp_flag: newBsp,
-        bsp_billing_period: newBsp ? newBspBillingPeriod : null,
-        line_items: lineItems.map((li) => ({
-          service_type: li.service_type,
-          description: li.description,
-          amount: parseFloat(li.amount) || 0,
-          commission_override_rate: li.commission_override_rate !== "" ? parseFloat(li.commission_override_rate) : null,
-          tax_code_id: li.tax_code_id !== "" ? li.tax_code_id : null,
-        })),
+        customer_id: newCustomerId,
+        currency: newCurrency,
+        bsp_flag: newBsp,
+        bsp_billing_period: newBspBillingPeriod || null,
+        payment_mode: newPaymentMode,
+        remarks: newRemarks,
+        visit_type: newVisitType,
+        spo_id: newSpoId || null,
+        supplier_id: newSupplierId || null,
+        print_name: newPrintName,
+        cost_center: newCostCenter,
+        adj_date: newAdjDate,
+        our_xo: newOurXo,
+        client_xo: newClientXo,
+        line_items: lineItems,
       }),
     });
     if (res.ok) {
       setShowNew(false);
-      setLineItems([{ service_type: defaultType, description: "", amount: "", commission_override_rate: "", tax_code_id: "" }]);
       setNewCustomerId("");
-      setNewBspBillingPeriod("");
+      setLineItems([defaultType === "Ticket" ? createDefaultTicketItem() : { service_type: defaultType, description: "", amount: "", commission_override_rate: "", tax_code_id: "" }]);
       loadInvoices();
+    } else {
+      const d = await res.json();
+      alert(d.error || "Failed to create invoice");
     }
   }
 
   async function postInvoice(id: string) {
     const res = await fetch(`/api/invoices/${id}/post`, { method: "POST" });
-    const data = await res.json();
-    if (!res.ok) alert(data.error);
-    loadInvoices();
+    if (res.ok) loadInvoices();
+    else { const d = await res.json(); alert(d.error); }
   }
 
   async function voidInvoice() {
@@ -153,14 +413,6 @@ export default function InvoicesPage() {
     setCreditDialog(null); setCreditAmount(""); setCreditReason(""); loadInvoices();
   }
 
-  function updateLineItem(index: number, field: keyof LineItemInput, value: string) {
-    const updated = [...lineItems]; updated[index][field] = value; setLineItems(updated);
-  }
-
-  function updateEditLineItem(index: number, field: keyof LineItemInput, value: string) {
-    const updated = [...editLineItems]; updated[index][field] = value; setEditLineItems(updated);
-  }
-
   async function openEditDialog(inv: Invoice) {
     setEditInvoiceId(inv._id);
     setEditLoading(true);
@@ -170,15 +422,73 @@ export default function InvoicesPage() {
     setEditCustomerId(customerId);
     setEditCurrency(inv.currency);
     setEditBsp(inv.bsp_flag);
-    setEditBspBillingPeriod("");
-    const items: LineItemInput[] = (data.line_items || []).map((li: { service_type: string; description: string; amount: number; commission_override_rate: number | null; tax_code_id: { _id?: string } | string | null }) => ({
-      service_type: li.service_type,
-      description: li.description || "",
+    setEditPaymentMode(data.invoice?.payment_mode || "CR");
+    setEditRemarks(data.invoice?.remarks || "NORMAL");
+    setEditVisitType(data.invoice?.visit_type || "Visitor");
+    setEditSpoId(data.invoice?.spo_id?._id || data.invoice?.spo_id || "");
+    setEditSupplierId(data.invoice?.supplier_id?._id || data.invoice?.supplier_id || "");
+    setEditPrintName(data.invoice?.print_name || "");
+    setEditCostCenter(data.invoice?.cost_center || "");
+    setEditAdjDate(data.invoice?.adj_date ? new Date(data.invoice.adj_date).toISOString().split("T")[0] : "");
+    setEditOurXo(data.invoice?.our_xo || "E");
+    setEditClientXo(data.invoice?.client_xo || "");
+
+    const items: LineItemInput[] = (data.line_items || []).map((li: Record<string, unknown>) => ({
+      service_type: String(li.service_type || "Ticket"),
+      description: String(li.description || ""),
       amount: String(li.amount),
       commission_override_rate: li.commission_override_rate ? String(li.commission_override_rate) : "",
-      tax_code_id: li.tax_code_id ? (typeof li.tax_code_id === "object" ? (li.tax_code_id as { _id?: string })._id || "" : String(li.tax_code_id)) : "",
+      tax_code_id: li.tax_code_id && typeof li.tax_code_id === "object" && "_id" in (li.tax_code_id as object) ? String((li.tax_code_id as { _id: unknown })._id) : String(li.tax_code_id || ""),
+      pax_name: String(li.pax_name || ""),
+      pax_type: String(li.pax_type || "A"),
+      passport_no: String(li.passport_no || ""),
+      passport_issue_date: String(li.passport_issue_date || ""),
+      ticket_number: String(li.ticket_number || ""),
+      conjunction_ticket_no: String(li.conjunction_ticket_no || ""),
+      gds_pnr: String(li.gds_pnr || ""),
+      gds_name: String(li.gds_name || "Amadeus"),
+      airline_name: String(li.airline_name || ""),
+      airline_code: String(li.airline_code || ""),
+      sector: String(li.sector || ""),
+      trip_type: String(li.trip_type || "International"),
+      doc_type: String(li.doc_type || "BSPD"),
+      tour_code: String(li.tour_code || ""),
+      issue_date: String(li.issue_date || ""),
+      flight_segments: Array.isArray(li.flight_segments) ? (li.flight_segments as FlightSegment[]) : [],
+      base_fare: String(li.base_fare || "0"),
+      tax_dof: String(li.tax_dof || "0"),
+      tax_yq: String(li.tax_yq || "0"),
+      tax_yr: String(li.tax_yr || "0"),
+      tax_rg: String(li.tax_rg || "0"),
+      tax_pk: String(li.tax_pk || "0"),
+      tax_apt: String(li.tax_apt || "0"),
+      tax_kbr: String(li.tax_kbr || "0"),
+      tax_kbp: String(li.tax_kbp || "0"),
+      tax_pb: String(li.tax_pb || "0"),
+      tax_xz: String(li.tax_xz || "0"),
+      tax_yd: String(li.tax_yd || "0"),
+      tax_yi: String(li.tax_yi || "0"),
+      tax_rn: String(li.tax_rn || "0"),
+      tax_city: String(li.tax_city || "0"),
+      tax_airline_city: String(li.tax_airline_city || "0"),
+      other_taxes: String(li.other_taxes || "0"),
+      wht_percent: String(li.wht_percent || "12"),
+      wht_amount: String(li.wht_amount || "0"),
+      commission_percent: String(li.commission_percent || "0"),
+      commission_amount: String(li.commission_amount || "0"),
+      discount_percent: String(li.discount_percent || "0"),
+      discount_amount: String(li.discount_amount || "0"),
+      psf_amount: String(li.psf_amount || "0"),
+      gst_percent: String(li.gst_percent || "5"),
+      gst_amount: String(li.gst_amount || "0"),
+      supplier_id: li.supplier_id && typeof li.supplier_id === "object" && "_id" in (li.supplier_id as object) ? String((li.supplier_id as { _id: unknown })._id) : String(li.supplier_id || ""),
+      customer_gross: Number(li.customer_gross) || 0,
+      customer_net: Number(li.customer_net) || Number(li.amount) || 0,
+      supplier_gross: Number(li.supplier_gross) || 0,
+      supplier_net: Number(li.supplier_net) || 0,
+      agency_margin: Number(li.agency_margin) || 0,
     }));
-    setEditLineItems(items.length > 0 ? items : [{ service_type: "Ticket", description: "", amount: "", commission_override_rate: "", tax_code_id: "" }]);
+    setEditLineItems(items.length > 0 ? items : [createDefaultTicketItem()]);
     setEditLoading(false);
   }
 
@@ -192,6 +502,16 @@ export default function InvoicesPage() {
         currency: editCurrency,
         bsp_flag: editBsp,
         bsp_billing_period: editBspBillingPeriod || null,
+        payment_mode: editPaymentMode,
+        remarks: editRemarks,
+        visit_type: editVisitType,
+        spo_id: editSpoId || null,
+        supplier_id: editSupplierId || null,
+        print_name: editPrintName,
+        cost_center: editCostCenter,
+        adj_date: editAdjDate,
+        our_xo: editOurXo,
+        client_xo: editClientXo,
         line_items: editLineItems,
       }),
     });
@@ -206,134 +526,538 @@ export default function InvoicesPage() {
     Voided: "bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400",
   };
 
+  // Render Ticket Editor Component (matching ERP screen)
+  const renderTicketForm = (item: LineItemInput, itemIdx: number, isEdit = false) => {
+    return (
+      <div className="space-y-4 text-[12px] bg-slate-50/50 dark:bg-[#0c0c0e] p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-inner">
+        {/* Row 1: Passenger & Ticket Main Details */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="space-y-1">
+            <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Pax Name *</Label>
+            <Input
+              placeholder="MR JAVED JAHANZEEB"
+              value={item.pax_name || ""}
+              onChange={(e) => updateTicketLineItem(itemIdx, "pax_name", e.target.value, isEdit)}
+              className="h-8 text-[12px] uppercase font-medium bg-white dark:bg-[#161619]"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Pax Type *</Label>
+            <Select value={item.pax_type || "A"} onValueChange={(v) => updateTicketLineItem(itemIdx, "pax_type", v || "A", isEdit)}>
+              <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="A">Adult (A)</SelectItem>
+                <SelectItem value="C">Child (C)</SelectItem>
+                <SelectItem value="I">Infant (I)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Passport No</Label>
+            <Input
+              placeholder="e.g. AB1234567"
+              value={item.passport_no || ""}
+              onChange={(e) => updateTicketLineItem(itemIdx, "passport_no", e.target.value, isEdit)}
+              className="h-8 text-[12px] uppercase bg-white dark:bg-[#161619]"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">PP Issue Date</Label>
+            <Input
+              type="date"
+              value={item.passport_issue_date || ""}
+              onChange={(e) => updateTicketLineItem(itemIdx, "passport_issue_date", e.target.value, isEdit)}
+              className="h-8 text-[12px] bg-white dark:bg-[#161619]"
+            />
+          </div>
+        </div>
+
+        {/* Row 2: Airline, Ticket No, PNR, GDS, Sector */}
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+          <div className="space-y-1">
+            <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Ticket No *</Label>
+            <Input
+              placeholder="157-2127-850-017"
+              value={item.ticket_number || ""}
+              onChange={(e) => updateTicketLineItem(itemIdx, "ticket_number", e.target.value, isEdit)}
+              className="h-8 text-[12px] font-mono bg-white dark:bg-[#161619]"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">GDS PNR</Label>
+            <Input
+              placeholder="PNR123"
+              value={item.gds_pnr || ""}
+              onChange={(e) => updateTicketLineItem(itemIdx, "gds_pnr", e.target.value.toUpperCase(), isEdit)}
+              className="h-8 text-[12px] font-mono uppercase font-bold text-blue-600 bg-white dark:bg-[#161619]"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Airline</Label>
+            <Input
+              placeholder="QATAR / 157"
+              value={item.airline_name || ""}
+              onChange={(e) => updateTicketLineItem(itemIdx, "airline_name", e.target.value.toUpperCase(), isEdit)}
+              className="h-8 text-[12px] uppercase bg-white dark:bg-[#161619]"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Sector</Label>
+            <Input
+              placeholder="LHE-DOH-BCN"
+              value={item.sector || ""}
+              onChange={(e) => updateTicketLineItem(itemIdx, "sector", e.target.value.toUpperCase(), isEdit)}
+              className="h-8 text-[12px] uppercase font-mono bg-white dark:bg-[#161619]"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">GDS System</Label>
+            <Select value={item.gds_name || "Amadeus"} onValueChange={(v) => updateTicketLineItem(itemIdx, "gds_name", v || "Amadeus", isEdit)}>
+              <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Amadeus">Amadeus</SelectItem>
+                <SelectItem value="Sabre">Sabre</SelectItem>
+                <SelectItem value="Galileo">Galileo</SelectItem>
+                <SelectItem value="Worldspan">Worldspan</SelectItem>
+                <SelectItem value="Direct">Direct Portal</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Trip Type</Label>
+            <Select value={item.trip_type || "International"} onValueChange={(v) => updateTicketLineItem(itemIdx, "trip_type", v || "International", isEdit)}>
+              <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="International">International</SelectItem>
+                <SelectItem value="Domestic">Domestic</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Flight Segments (Multi-Leg Table) */}
+        <div className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden bg-white dark:bg-[#111113]">
+          <div className="bg-slate-100 dark:bg-slate-900 px-3 py-2 flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
+            <span className="font-bold text-[11px] text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+              <Plane className="h-3.5 w-3.5 text-blue-600" /> Flight Routing &amp; Segments
+            </span>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-6 text-[10px] px-2 gap-1"
+              onClick={() => addFlightSegment(itemIdx, isEdit)}
+            >
+              <Plus className="h-2.5 w-2.5" /> Add Leg
+            </Button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-[11px]">
+              <thead className="bg-slate-50 dark:bg-[#161618] border-b border-slate-200 dark:border-slate-800 text-slate-500 font-semibold">
+                <tr>
+                  <th className="p-1.5 text-left">City</th>
+                  <th className="p-1.5 text-left">Fl. No</th>
+                  <th className="p-1.5 text-left">Cl</th>
+                  <th className="p-1.5 text-left">Dep Date</th>
+                  <th className="p-1.5 text-left">Dep Time</th>
+                  <th className="p-1.5 text-left">Arr Time</th>
+                  <th className="p-1.5 text-left">Fare Basis</th>
+                  <th className="p-1.5 text-center w-8"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {(item.flight_segments || []).map((seg, segIdx) => (
+                  <tr key={segIdx} className="border-b border-slate-100 dark:border-slate-800/60">
+                    <td className="p-1">
+                      <Input
+                        placeholder="LHE"
+                        value={seg.city}
+                        onChange={(e) => updateFlightSegment(itemIdx, segIdx, "city", e.target.value.toUpperCase(), isEdit)}
+                        className="h-7 text-[11px] uppercase font-mono w-20 bg-transparent"
+                      />
+                    </td>
+                    <td className="p-1">
+                      <Input
+                        placeholder="621"
+                        value={seg.flight_no}
+                        onChange={(e) => updateFlightSegment(itemIdx, segIdx, "flight_no", e.target.value, isEdit)}
+                        className="h-7 text-[11px] w-16 bg-transparent"
+                      />
+                    </td>
+                    <td className="p-1">
+                      <Input
+                        placeholder="Y"
+                        value={seg.booking_class}
+                        onChange={(e) => updateFlightSegment(itemIdx, segIdx, "booking_class", e.target.value.toUpperCase(), isEdit)}
+                        className="h-7 text-[11px] uppercase font-mono w-10 text-center bg-transparent"
+                      />
+                    </td>
+                    <td className="p-1">
+                      <Input
+                        type="date"
+                        value={seg.dep_date}
+                        onChange={(e) => updateFlightSegment(itemIdx, segIdx, "dep_date", e.target.value, isEdit)}
+                        className="h-7 text-[11px] w-28 bg-transparent"
+                      />
+                    </td>
+                    <td className="p-1">
+                      <Input
+                        placeholder="14:30"
+                        value={seg.dep_time}
+                        onChange={(e) => updateFlightSegment(itemIdx, segIdx, "dep_time", e.target.value, isEdit)}
+                        className="h-7 text-[11px] font-mono w-16 bg-transparent"
+                      />
+                    </td>
+                    <td className="p-1">
+                      <Input
+                        placeholder="18:45"
+                        value={seg.arr_time}
+                        onChange={(e) => updateFlightSegment(itemIdx, segIdx, "arr_time", e.target.value, isEdit)}
+                        className="h-7 text-[11px] font-mono w-16 bg-transparent"
+                      />
+                    </td>
+                    <td className="p-1">
+                      <Input
+                        placeholder="KLE01PK"
+                        value={seg.fare_basis}
+                        onChange={(e) => updateFlightSegment(itemIdx, segIdx, "fare_basis", e.target.value.toUpperCase(), isEdit)}
+                        className="h-7 text-[11px] font-mono uppercase w-24 bg-transparent"
+                      />
+                    </td>
+                    <td className="p-1 text-center">
+                      {(item.flight_segments || []).length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeFlightSegment(itemIdx, segIdx, isEdit)}
+                          className="text-slate-400 hover:text-red-500"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Airfare, IATA Taxes & Deductions Matrix */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Left: Taxes Breakdown Box */}
+          <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111113] space-y-2.5">
+            <div className="font-bold text-[11px] text-slate-800 dark:text-slate-200 border-b pb-1 flex justify-between">
+              <span>Airfare &amp; IATA Airline Taxes</span>
+              <span className="font-mono text-blue-600">Base + Taxes</span>
+            </div>
+            <div className="grid grid-cols-4 gap-2 text-[11px]">
+              <div className="col-span-2">
+                <span className="text-[10px] text-slate-500 font-semibold block">Base Fare *</span>
+                <Input
+                  type="number"
+                  placeholder="37024"
+                  value={item.base_fare || ""}
+                  onChange={(e) => updateTicketLineItem(itemIdx, "base_fare", e.target.value, isEdit)}
+                  className="h-7 text-[11px] font-mono font-bold"
+                />
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-500 font-semibold block">DOF (Surcharge)</span>
+                <Input
+                  type="number"
+                  placeholder="976"
+                  value={item.tax_dof || ""}
+                  onChange={(e) => updateTicketLineItem(itemIdx, "tax_dof", e.target.value, isEdit)}
+                  className="h-7 text-[11px] font-mono"
+                />
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-500 font-semibold block">YQ / YR (Fuel)</span>
+                <Input
+                  type="number"
+                  placeholder="0"
+                  value={item.tax_yq || ""}
+                  onChange={(e) => updateTicketLineItem(itemIdx, "tax_yq", e.target.value, isEdit)}
+                  className="h-7 text-[11px] font-mono"
+                />
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-500 font-semibold block">RG (FED Tax)</span>
+                <Input
+                  type="number"
+                  placeholder="0"
+                  value={item.tax_rg || ""}
+                  onChange={(e) => updateTicketLineItem(itemIdx, "tax_rg", e.target.value, isEdit)}
+                  className="h-7 text-[11px] font-mono"
+                />
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-500 font-semibold block">PK (CAA Fee)</span>
+                <Input
+                  type="number"
+                  placeholder="0"
+                  value={item.tax_pk || ""}
+                  onChange={(e) => updateTicketLineItem(itemIdx, "tax_pk", e.target.value, isEdit)}
+                  className="h-7 text-[11px] font-mono"
+                />
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-500 font-semibold block">RN</span>
+                <Input
+                  type="number"
+                  placeholder="0"
+                  value={item.tax_rn || ""}
+                  onChange={(e) => updateTicketLineItem(itemIdx, "tax_rn", e.target.value, isEdit)}
+                  className="h-7 text-[11px] font-mono"
+                />
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-500 font-semibold block">Other / XT</span>
+                <Input
+                  type="number"
+                  placeholder="0"
+                  value={item.tax_airline_city || ""}
+                  onChange={(e) => updateTicketLineItem(itemIdx, "tax_airline_city", e.target.value, isEdit)}
+                  className="h-7 text-[11px] font-mono"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Right: Commercials, Commission, WHT & Discounts */}
+          <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111113] space-y-2.5">
+            <div className="font-bold text-[11px] text-slate-800 dark:text-slate-200 border-b pb-1 flex justify-between">
+              <span>Commercials, WHT &amp; Profit Markup</span>
+              <span className="font-mono text-emerald-600">Deductions</span>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-[11px]">
+              <div>
+                <span className="text-[10px] text-slate-500 font-semibold block">WHT (%)</span>
+                <Input
+                  type="number"
+                  placeholder="12"
+                  value={item.wht_percent || ""}
+                  onChange={(e) => updateTicketLineItem(itemIdx, "wht_percent", e.target.value, isEdit)}
+                  className="h-7 text-[11px] font-mono"
+                />
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-500 font-semibold block">Commission (%)</span>
+                <Input
+                  type="number"
+                  placeholder="0"
+                  value={item.commission_percent || ""}
+                  onChange={(e) => updateTicketLineItem(itemIdx, "commission_percent", e.target.value, isEdit)}
+                  className="h-7 text-[11px] font-mono"
+                />
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-500 font-semibold block">Discount (%)</span>
+                <Input
+                  type="number"
+                  placeholder="0"
+                  value={item.discount_percent || ""}
+                  onChange={(e) => updateTicketLineItem(itemIdx, "discount_percent", e.target.value, isEdit)}
+                  className="h-7 text-[11px] font-mono"
+                />
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-500 font-semibold block">PSF / Service Fee</span>
+                <Input
+                  type="number"
+                  placeholder="0"
+                  value={item.psf_amount || ""}
+                  onChange={(e) => updateTicketLineItem(itemIdx, "psf_amount", e.target.value, isEdit)}
+                  className="h-7 text-[11px] font-mono font-semibold text-emerald-600"
+                />
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-500 font-semibold block">GST (%)</span>
+                <Input
+                  type="number"
+                  placeholder="5"
+                  value={item.gst_percent || ""}
+                  onChange={(e) => updateTicketLineItem(itemIdx, "gst_percent", e.target.value, isEdit)}
+                  className="h-7 text-[11px] font-mono"
+                />
+              </div>
+              <div className="flex items-end">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="h-7 text-[10px] w-full gap-1"
+                  onClick={() => updateTicketLineItem(itemIdx, "base_fare", item.base_fare, isEdit)}
+                >
+                  <Calculator className="h-3 w-3" /> Auto-Calc
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Real-Time Accounting Totals Strip (matching ERP bottom right) */}
+        <div className="p-3 rounded-lg bg-slate-900 text-white flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-6 font-mono text-[12px]">
+            <div>
+              <span className="text-slate-400 text-[10px] block uppercase font-bold tracking-wider">Customer Gross</span>
+              <span className="font-bold">{item.customer_gross?.toLocaleString() || "0.00"}</span>
+            </div>
+            <div>
+              <span className="text-slate-400 text-[10px] block uppercase font-bold tracking-wider">Customer Net (Bill)</span>
+              <span className="font-bold text-emerald-400 text-[13px]">{item.customer_net?.toLocaleString() || "0.00"}</span>
+            </div>
+            <div>
+              <span className="text-slate-400 text-[10px] block uppercase font-bold tracking-wider">Supplier Gross</span>
+              <span className="font-bold">{item.supplier_gross?.toLocaleString() || "0.00"}</span>
+            </div>
+            <div>
+              <span className="text-slate-400 text-[10px] block uppercase font-bold tracking-wider">Supplier Net (Cost)</span>
+              <span className="font-bold text-amber-400 text-[13px]">{item.supplier_net?.toLocaleString() || "0.00"}</span>
+            </div>
+          </div>
+          <div className="text-right">
+            <span className="text-slate-400 text-[10px] block uppercase font-bold tracking-wider">Agency Margin / Profit</span>
+            <span className="font-mono font-extrabold text-blue-400 text-[14px]">
+              + {item.agency_margin?.toLocaleString() || "0.00"}
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div>
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-50">Invoices{typeFilter ? ` — ${typeFilter}s` : ""}</h1>
-          <p className="text-[13px] text-gray-500 dark:text-gray-400 mt-1">Manage your invoices and billing</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-50">
+            Invoices{typeFilter ? ` — ${typeFilter}s` : ""}
+          </h1>
+          <p className="text-[13px] text-gray-500 dark:text-gray-400 mt-1">Manage ticket sales, airline billing, and travel invoices</p>
         </div>
         <Dialog open={showNew} onOpenChange={setShowNew}>
           <DialogTrigger className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-[13px] font-medium text-primary-foreground hover:bg-primary/90 shadow-sm transition-colors">
-            <Plus className="h-4 w-4" /> New Invoice
+            <Plus className="h-4 w-4" /> New Invoice / Ticket Sale
           </DialogTrigger>
-          <DialogContent className="max-w-xl w-full">
+          <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto w-full">
             <DialogHeader>
-              <DialogTitle className="text-lg font-semibold">Create Invoice</DialogTitle>
+              <DialogTitle className="text-lg font-bold flex items-center gap-2">
+                <FileText className="h-5 w-5 text-primary" />
+                {defaultType === "Ticket" ? "Ticket Booking & Sale Invoice" : "Create New Invoice"}
+              </DialogTitle>
             </DialogHeader>
-            <div className="space-y-5 pt-2">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label className="text-[13px]">Customer</Label>
-                  <Select value={newCustomerId} onValueChange={(v) => v && setNewCustomerId(v)}>
-                    <SelectTrigger className="h-10"><SelectValue placeholder="Select customer" /></SelectTrigger>
-                    <SelectContent>{customers.map((c) => (<SelectItem key={c._id} value={c._id}>{c.name}</SelectItem>))}</SelectContent>
+
+            <div className="space-y-4 pt-1">
+              {/* Top Invoice Header Grid (Matching ERP Header) */}
+              <div className="p-3.5 bg-slate-100/70 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-800 grid grid-cols-2 md:grid-cols-4 gap-3 text-[12px]">
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-semibold">Customer *</Label>
+                  <Select value={newCustomerId} onValueChange={(v) => {
+                    const val = v || "";
+                    setNewCustomerId(val);
+                    const cust = customers.find(c => c._id === val);
+                    if (cust) setNewPrintName(cust.name);
+                  }}>
+                    <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]"><SelectValue placeholder="Select Customer" /></SelectTrigger>
+                    <SelectContent>{customers.map((c) => <SelectItem key={c._id} value={c._id}>{c.name}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="text-[13px]">Currency</Label>
-                  <Select value={newCurrency} onValueChange={(v) => v && setNewCurrency(v)}>
-                    <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
-                    <SelectContent>{["PKR", "USD", "GBP", "SAR", "AED"].map((c) => (<SelectItem key={c} value={c}>{c}</SelectItem>))}</SelectContent>
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-semibold">Print Name</Label>
+                  <Input value={newPrintName} onChange={(e) => setNewPrintName(e.target.value)} placeholder="Customer Print Name" className="h-8 text-[12px] bg-white dark:bg-[#161619]" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-semibold">Supplier / BSP</Label>
+                  <Select value={newSupplierId} onValueChange={(v) => setNewSupplierId(v || "")}>
+                    <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]"><SelectValue placeholder="Bank Settlement Plan" /></SelectTrigger>
+                    <SelectContent>{suppliers.map((s) => <SelectItem key={s._id} value={s._id}>{s.name} {s.code ? `(${s.code})` : ''}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-semibold">Payment Mode</Label>
+                  <Select value={newPaymentMode} onValueChange={(v) => setNewPaymentMode(v || "CR")}>
+                    <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="CR">CR (Credit)</SelectItem>
+                      <SelectItem value="Cash">Cash</SelectItem>
+                      <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                      <SelectItem value="Cheque">Cheque</SelectItem>
+                      <SelectItem value="Card">Card</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-semibold">Inv Date</Label>
+                  <Input type="date" value={newInvDate} onChange={(e) => setNewInvDate(e.target.value)} className="h-8 text-[12px] bg-white dark:bg-[#161619]" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-semibold">Adj Date</Label>
+                  <Input type="date" value={newAdjDate} onChange={(e) => setNewAdjDate(e.target.value)} className="h-8 text-[12px] bg-white dark:bg-[#161619]" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-semibold">SPO / Agent</Label>
+                  <Select value={newSpoId} onValueChange={(v) => setNewSpoId(v || "")}>
+                    <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]"><SelectValue placeholder="Booking Agent" /></SelectTrigger>
+                    <SelectContent>{staffUsers.map((u) => <SelectItem key={u._id} value={u._id}>{u.name} ({u.role})</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-semibold">Remarks</Label>
+                  <Select value={newRemarks} onValueChange={(v) => setNewRemarks(v || "NORMAL")}>
+                    <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="NORMAL">NORMAL</SelectItem>
+                      <SelectItem value="REISSUE">REISSUE</SelectItem>
+                      <SelectItem value="REFUND">REFUND</SelectItem>
+                      <SelectItem value="DATE CHANGE">DATE CHANGE</SelectItem>
+                    </SelectContent>
                   </Select>
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-4 items-center">
-                <label className="flex items-center gap-2.5 cursor-pointer">
-                  <input type="checkbox" checked={newBsp} onChange={(e) => setNewBsp(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" />
-                  <span className="text-[13px] font-medium text-gray-700 dark:text-gray-300">BSP Transaction</span>
-                </label>
-                {newBsp && (
-                  <div className="flex-1 w-full space-y-1.5">
-                    <Label className="text-[13px]">BSP Billing Period</Label>
-                    <Input placeholder="e.g. 2026-08 1st half" value={newBspBillingPeriod} onChange={(e) => setNewBspBillingPeriod(e.target.value)} className="h-9 text-[13px]" />
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <Label className="text-[13px] mb-3 block">Line Items</Label>
-                <div className="space-y-3">
-                  {lineItems.map((li, i) => {
-                    const isOther = li.service_type === "Other";
-                    return (
-                      <div key={i} className="rounded-xl border border-gray-200/60 dark:border-[#1e1e21] p-3 space-y-2.5 bg-gray-50/40 dark:bg-[#0e0e10]/30">
-                        {/* Row 1: Service Type chip or locked badge */}
-                        <div className="flex gap-2 items-center">
-                          {typeFilter && typeFilter !== "Other" ? (
-                            <span className="inline-flex items-center rounded-lg bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-foreground px-3 h-9 text-[13px] font-semibold">
-                              {typeFilter}
-                            </span>
-                          ) : (
-                            <Select value={li.service_type} onValueChange={(v) => v && updateLineItem(i, "service_type", v)}>
-                              <SelectTrigger className="h-9 text-[13px] w-[130px] flex-shrink-0"><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                {["Ticket", "Hotel", "Package", "Umrah", "Visa", "Other"].map((t) => (
-                                  <SelectItem key={t} value={t}>{t}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          )}
-                          {/* Description — if Other, also show custom type name input */}
-                          {isOther ? (
-                            <Input placeholder="Type name (e.g. Car Rental)" value={li.description} onChange={(e) => updateLineItem(i, "description", e.target.value)} className="h-9 text-[13px] flex-1" />
-                          ) : (
-                            <Input placeholder="Description" value={li.description} onChange={(e) => updateLineItem(i, "description", e.target.value)} className="h-9 text-[13px] flex-1" />
-                          )}
-                          {lineItems.length > 1 && (
-                            <button onClick={() => setLineItems(lineItems.filter((_, idx) => idx !== i))} className="h-9 w-9 flex-shrink-0 flex items-center justify-center rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 text-gray-400 hover:text-red-500 transition-colors">
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          )}
-                        </div>
-
-                        {/* Row 2: Amount, Comm %, Tax */}
-                        <div className="grid grid-cols-3 gap-2">
-                          <div>
-                            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide block mb-1">Amount</span>
-                            <Input placeholder="0" type="number" value={li.amount} onChange={(e) => updateLineItem(i, "amount", e.target.value)} className="h-9 text-[13px] font-mono w-full" />
-                          </div>
-                          <div>
-                            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide block mb-1">Comm %</span>
-                            <Input placeholder="Agent default" type="number" value={li.commission_override_rate} onChange={(e) => updateLineItem(i, "commission_override_rate", e.target.value)} className="h-9 text-[13px] font-mono w-full" />
-                          </div>
-                          <div>
-                            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide block mb-1">Tax</span>
-                            <Select value={li.tax_code_id || "none"} onValueChange={(v) => updateLineItem(i, "tax_code_id", v === "none" ? "" : (v || ""))}>
-                              <SelectTrigger className="h-9 text-[13px] w-full">
-                                <SelectValue placeholder="Choose Tax" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="none">No Tax</SelectItem>
-                                {taxCodes.map((tc) => (
-                                  <SelectItem key={tc._id} value={tc._id}>
-                                    {tc.code} ({tc.rate}%)
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
+              {/* Service Line Items */}
+              {lineItems.map((li, idx) => (
+                <div key={idx}>
+                  {li.service_type === "Ticket" ? (
+                    renderTicketForm(li, idx, false)
+                  ) : (
+                    <div className="p-4 rounded-xl border border-gray-200 dark:border-gray-800 space-y-3 bg-gray-50/50">
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Description"
+                          value={li.description}
+                          onChange={(e) => {
+                            const arr = [...lineItems];
+                            arr[idx].description = e.target.value;
+                            setLineItems(arr);
+                          }}
+                          className="flex-1 h-9 text-[13px]"
+                        />
+                        <Input
+                          placeholder="Amount"
+                          type="number"
+                          value={li.amount}
+                          onChange={(e) => {
+                            const arr = [...lineItems];
+                            arr[idx].amount = e.target.value;
+                            setLineItems(arr);
+                          }}
+                          className="w-32 h-9 text-[13px] font-mono"
+                        />
                       </div>
-                    );
-                  })}
+                    </div>
+                  )}
                 </div>
-                <Button variant="outline" size="sm" className="mt-3 gap-1.5 text-[12px]" onClick={() => setLineItems([...lineItems, { service_type: typeFilter && typeFilter !== "Other" ? typeFilter : "Other", description: "", amount: "", commission_override_rate: "", tax_code_id: "" }])}>
-                  <Plus className="h-3 w-3" /> Add Line
+              ))}
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                <Button variant="outline" onClick={() => setShowNew(false)}>Cancel</Button>
+                <Button onClick={createInvoice} disabled={!newCustomerId || lineItems.length === 0} className="gap-2">
+                  <FileText className="h-4 w-4" /> Save Invoice
                 </Button>
               </div>
-
-              <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-[#1e1e21]">
-                <span className="text-[13px] font-medium text-gray-500">Total</span>
-                <span className="text-xl font-bold text-gray-900 dark:text-gray-50 font-mono">
-                  {newCurrency} {lineItems.reduce((s, li) => s + (parseFloat(li.amount) || 0), 0).toLocaleString()}
-                </span>
-              </div>
-
-              <Button onClick={createInvoice} className="w-full h-10 gap-2" disabled={!newCustomerId || lineItems.every((li) => !li.amount)}>
-                <FileTextIcon className="h-4 w-4" /> Create Draft Invoice
-              </Button>
             </div>
           </DialogContent>
         </Dialog>
@@ -341,11 +1065,13 @@ export default function InvoicesPage() {
 
       <Card className="bg-white dark:bg-[#111113] border-gray-200/80 dark:border-[#1e1e21] shadow-sm">
         <CardHeader className="px-6 pt-5 pb-3">
-          <CardTitle className="text-[15px] font-semibold text-gray-900 dark:text-gray-50">All Invoices</CardTitle>
+          <CardTitle className="text-[15px] font-semibold text-gray-900 dark:text-gray-50">Invoice Register</CardTitle>
         </CardHeader>
         <CardContent className="px-6 pb-5">
           {loading ? (
-            <div className="flex items-center justify-center py-12"><div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>
+            <div className="flex items-center justify-center py-12">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
@@ -356,17 +1082,17 @@ export default function InvoicesPage() {
                     <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Status</TableHead>
                     <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Currency</TableHead>
                     <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 text-right">Amount</TableHead>
-                    <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">BSP</TableHead>
+                    <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Pay Mode</TableHead>
                     <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Date</TableHead>
                     <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {invoices.length === 0 ? (
-                    <TableRow><TableCell colSpan={8} className="text-center py-12 text-[13px] text-gray-400">No invoices yet. Create your first invoice to get started.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={8} className="text-center py-12 text-[13px] text-gray-400">No invoices recorded yet.</TableCell></TableRow>
                   ) : invoices.map((inv) => (
                     <TableRow key={inv._id} className="border-gray-100 dark:border-[#1e1e21] hover:bg-gray-50/50 dark:hover:bg-[#151517]">
-                      <TableCell className="font-mono text-[13px] font-medium text-gray-900 dark:text-gray-100">{inv.invoice_number}</TableCell>
+                      <TableCell className="font-mono text-[13px] font-semibold text-gray-900 dark:text-gray-100">{inv.invoice_number}</TableCell>
                       <TableCell className="text-[13px] text-gray-600 dark:text-gray-300">{typeof inv.customer_id === "object" ? inv.customer_id.name : "-"}</TableCell>
                       <TableCell>
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${statusStyles[inv.status] || ""}`}>
@@ -375,7 +1101,7 @@ export default function InvoicesPage() {
                       </TableCell>
                       <TableCell className="text-[13px] text-gray-500">{inv.currency}</TableCell>
                       <TableCell className="text-right font-mono text-[13px] font-semibold text-gray-900 dark:text-gray-100">{inv.total_amount.toLocaleString()}</TableCell>
-                      <TableCell>{inv.bsp_flag ? <Badge variant="outline" className="text-[10px] font-medium">BSP</Badge> : ""}</TableCell>
+                      <TableCell><Badge variant="outline" className="text-[10px] font-mono">{inv.payment_mode || "CR"}</Badge></TableCell>
                       <TableCell className="text-[13px] text-gray-500">{new Date(inv.created_at).toLocaleDateString()}</TableCell>
                       <TableCell>
                         <div className="flex gap-1.5 flex-wrap">
@@ -420,86 +1146,77 @@ export default function InvoicesPage() {
 
       {/* Edit Invoice Dialog */}
       <Dialog open={!!editInvoiceId} onOpenChange={(open) => !open && setEditInvoiceId(null)}>
-        <DialogContent className="max-w-xl w-full">
+        <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto w-full">
           <DialogHeader>
-            <DialogTitle className="text-lg font-semibold">Edit Invoice</DialogTitle>
+            <DialogTitle className="text-lg font-bold flex items-center gap-2">
+              <Pencil className="h-5 w-5 text-primary" /> Edit Ticket Invoice
+            </DialogTitle>
           </DialogHeader>
           {editLoading ? (
             <div className="flex items-center justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
           ) : (
-            <div className="space-y-5 pt-2">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label className="text-[13px]">Customer</Label>
-                  <Select value={editCustomerId} onValueChange={(v) => v && setEditCustomerId(v)}>
-                    <SelectTrigger className="h-10"><SelectValue placeholder="Select customer" /></SelectTrigger>
-                    <SelectContent>{customers.map((c) => (<SelectItem key={c._id} value={c._id}>{c.name}</SelectItem>))}</SelectContent>
+            <div className="space-y-4 pt-1">
+              <div className="p-3.5 bg-slate-100/70 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-800 grid grid-cols-2 md:grid-cols-4 gap-3 text-[12px]">
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-semibold">Customer *</Label>
+                  <Select value={editCustomerId} onValueChange={(v) => setEditCustomerId(v || "")}>
+                    <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]"><SelectValue /></SelectTrigger>
+                    <SelectContent>{customers.map((c) => <SelectItem key={c._id} value={c._id}>{c.name}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="text-[13px]">Currency</Label>
-                  <Select value={editCurrency} onValueChange={(v) => v && setEditCurrency(v)}>
-                    <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
-                    <SelectContent>{["PKR", "USD", "GBP", "SAR", "AED"].map((c) => (<SelectItem key={c} value={c}>{c}</SelectItem>))}</SelectContent>
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-semibold">Print Name</Label>
+                  <Input value={editPrintName} onChange={(e) => setEditPrintName(e.target.value)} className="h-8 text-[12px] bg-white dark:bg-[#161619]" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-semibold">Payment Mode</Label>
+                  <Select value={editPaymentMode} onValueChange={(v) => setEditPaymentMode(v || "CR")}>
+                    <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="CR">CR (Credit)</SelectItem>
+                      <SelectItem value="Cash">Cash</SelectItem>
+                      <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                      <SelectItem value="Cheque">Cheque</SelectItem>
+                      <SelectItem value="Card">Card</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-semibold">Remarks</Label>
+                  <Select value={editRemarks} onValueChange={(v) => setEditRemarks(v || "NORMAL")}>
+                    <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="NORMAL">NORMAL</SelectItem>
+                      <SelectItem value="REISSUE">REISSUE</SelectItem>
+                      <SelectItem value="REFUND">REFUND</SelectItem>
+                      <SelectItem value="DATE CHANGE">DATE CHANGE</SelectItem>
+                    </SelectContent>
                   </Select>
                 </div>
               </div>
 
-              <label className="flex items-center gap-2.5 cursor-pointer">
-                <input type="checkbox" checked={editBsp} onChange={(e) => setEditBsp(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" />
-                <span className="text-[13px] font-medium text-gray-700 dark:text-gray-300">BSP Transaction</span>
-              </label>
-
-              <div>
-                <Label className="text-[13px] mb-3 block">Line Items</Label>
-                <div className="space-y-3">
-                  {editLineItems.map((li, i) => (
-                    <div key={i} className="rounded-xl border border-gray-200/60 dark:border-[#1e1e21] p-3 space-y-2.5 bg-gray-50/40 dark:bg-[#0e0e10]/30">
-                      <div className="flex gap-2 items-center">
-                        <Select value={li.service_type} onValueChange={(v) => v && updateEditLineItem(i, "service_type", v)}>
-                          <SelectTrigger className="h-9 text-[13px] w-[130px] flex-shrink-0"><SelectValue /></SelectTrigger>
-                          <SelectContent>{["Ticket", "Hotel", "Package", "Umrah", "Visa", "Other"].map((t) => (<SelectItem key={t} value={t}>{t}</SelectItem>))}</SelectContent>
-                        </Select>
-                        <Input placeholder="Description" value={li.description} onChange={(e) => updateEditLineItem(i, "description", e.target.value)} className="h-9 text-[13px] flex-1" />
-                        {editLineItems.length > 1 && (
-                          <button onClick={() => setEditLineItems(editLineItems.filter((_, idx) => idx !== i))} className="h-9 w-9 flex-shrink-0 flex items-center justify-center rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 text-gray-400 hover:text-red-500 transition-colors">
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                      </div>
-                      <div className="grid grid-cols-3 gap-2">
-                        <div>
-                          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide block mb-1">Amount</span>
-                          <Input placeholder="0" type="number" value={li.amount} onChange={(e) => updateEditLineItem(i, "amount", e.target.value)} className="h-9 text-[13px] font-mono w-full" />
-                        </div>
-                        <div>
-                          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide block mb-1">Comm %</span>
-                          <Input placeholder="Default" type="number" value={li.commission_override_rate} onChange={(e) => updateEditLineItem(i, "commission_override_rate", e.target.value)} className="h-9 text-[13px] font-mono w-full" />
-                        </div>
-                        <div>
-                          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide block mb-1">Tax</span>
-                          <Select value={li.tax_code_id || "none"} onValueChange={(v) => updateEditLineItem(i, "tax_code_id", v === "none" ? "" : (v || ""))}>
-                            <SelectTrigger className="h-9 text-[13px] w-full"><SelectValue placeholder="No Tax" /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">No Tax</SelectItem>
-                              {taxCodes.map((tc) => (<SelectItem key={tc._id} value={tc._id}>{tc.code} ({tc.rate}%)</SelectItem>))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
+              {editLineItems.map((li, idx) => (
+                <div key={idx}>
+                  {li.service_type === "Ticket" ? renderTicketForm(li, idx, true) : (
+                    <div className="p-4 rounded-xl border border-gray-200 dark:border-gray-800 space-y-3 bg-gray-50/50">
+                      <Input
+                        placeholder="Description"
+                        value={li.description}
+                        onChange={(e) => {
+                          const arr = [...editLineItems];
+                          arr[idx].description = e.target.value;
+                          setEditLineItems(arr);
+                        }}
+                        className="h-9 text-[13px]"
+                      />
                     </div>
-                  ))}
+                  )}
                 </div>
-                <Button variant="outline" size="sm" className="mt-3 gap-1.5 text-[12px]" onClick={() => setEditLineItems([...editLineItems, { service_type: "Ticket", description: "", amount: "", commission_override_rate: "", tax_code_id: "" }])}>
-                  <Plus className="h-3 w-3" /> Add Line
-                </Button>
-              </div>
+              ))}
 
-              <div className="flex gap-3 pt-2 border-t border-gray-100 dark:border-[#1e1e21]">
-                <Button variant="outline" className="flex-1" onClick={() => setEditInvoiceId(null)}>Cancel</Button>
-                <Button className="flex-1 gap-2" onClick={saveEditInvoice}>
-                  Save Changes
-                </Button>
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                <Button variant="outline" onClick={() => setEditInvoiceId(null)}>Cancel</Button>
+                <Button onClick={saveEditInvoice} className="gap-2">Save Changes</Button>
               </div>
             </div>
           )}
@@ -516,7 +1233,7 @@ export default function InvoicesPage() {
               <Textarea value={voidReason} onChange={(e) => setVoidReason(e.target.value)} placeholder="Why is this invoice being voided?" className="min-h-[80px]" />
             </div>
             <Button variant="destructive" onClick={voidInvoice} disabled={!voidReason} className="w-full gap-2">
-              <Ban className="h-4 w-4" /> Confirm Void
+              <Ban className="h-4 w-4" /> Void Invoice
             </Button>
           </div>
         </DialogContent>
@@ -528,60 +1245,52 @@ export default function InvoicesPage() {
           <DialogHeader><DialogTitle className="text-lg font-semibold">Issue Credit Note</DialogTitle></DialogHeader>
           <div className="space-y-4 pt-2">
             <div className="space-y-1.5">
-              <Label className="text-[13px]">Amount</Label>
-              <Input type="number" value={creditAmount} onChange={(e) => setCreditAmount(e.target.value)} className="h-10 font-mono" />
+              <Label className="text-[13px]">Credit Amount</Label>
+              <Input type="number" value={creditAmount} onChange={(e) => setCreditAmount(e.target.value)} placeholder="0" className="h-10 font-mono" />
             </div>
             <div className="space-y-1.5">
               <Label className="text-[13px]">Reason</Label>
-              <Textarea value={creditReason} onChange={(e) => setCreditReason(e.target.value)} className="min-h-[80px]" />
+              <Textarea value={creditReason} onChange={(e) => setCreditReason(e.target.value)} placeholder="Reason for issuing credit note..." className="min-h-[80px]" />
             </div>
-            <Button onClick={issueCreditNote} disabled={!creditAmount || !creditReason} className="w-full gap-2">
+            <Button onClick={issueCreditNote} disabled={!creditAmount || !creditReason} className="w-full h-10 gap-2">
               <CreditCard className="h-4 w-4" /> Issue Credit Note
             </Button>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Audit Trail Dialog */}
-      <Dialog open={!!auditDialogInvoice} onOpenChange={(open) => !open && setAuditDialogInvoice(null)}>
+      {/* Audit Logs Dialog */}
+      <Dialog open={!!auditDialogInvoice} onOpenChange={() => setAuditDialogInvoice(null)}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-lg font-semibold">Audit Trail — {auditDialogInvoice?.invoice_number}</DialogTitle>
+            <DialogTitle className="text-lg font-semibold flex items-center gap-2">
+              <History className="h-5 w-5 text-primary" />
+              Audit Trail — {auditDialogInvoice?.invoice_number}
+            </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 pt-2">
+          <div className="space-y-3 pt-2">
             {loadingLogs ? (
-              <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
+              <div className="flex items-center justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
             ) : auditLogs.length === 0 ? (
-              <p className="text-center py-8 text-[13px] text-gray-400">No change logs recorded for this invoice.</p>
+              <p className="text-center py-8 text-[13px] text-gray-400">No modifications logged yet.</p>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {auditLogs.map((log) => (
-                  <div key={log._id} className="p-3 rounded-lg border border-gray-100 dark:border-[#1e1e21] bg-gray-50/30 dark:bg-[#0e0e10]/10 text-[12px] space-y-1">
-                    <div className="flex justify-between items-center">
-                      <span className="font-semibold text-gray-700 dark:text-gray-300">Field: {log.field_changed}</span>
-                      <span className="text-gray-400 text-[10px]">{new Date(log.changed_at).toLocaleString()}</span>
+                  <div key={log._id} className="p-3 rounded-lg border border-gray-100 dark:border-[#1e1e21] bg-gray-50/50 dark:bg-[#0e0e10]/30 text-[12px] space-y-1">
+                    <div className="flex items-center justify-between text-gray-500">
+                      <span className="font-semibold text-gray-900 dark:text-gray-100">{log.changed_by?.name || "System"}</span>
+                      <span>{new Date(log.changed_at).toLocaleString()}</span>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 text-gray-500 font-mono text-[11px] bg-white dark:bg-[#111113] p-1.5 rounded border border-gray-100 dark:border-[#1e1e21] mt-1">
-                      <div><span className="text-red-500 font-semibold">Old:</span> {log.old_value !== null ? String(log.old_value) : "null"}</div>
-                      <div><span className="text-emerald-500 font-semibold">New:</span> {log.new_value !== null ? String(log.new_value) : "null"}</div>
-                    </div>
-                    <div className="text-gray-400 text-[10px] pt-1">
-                      Changed by: <span className="font-semibold text-gray-600 dark:text-gray-400">{log.changed_by?.name || "System"}</span>
-                    </div>
+                    <p className="font-mono text-[11px] text-gray-700 dark:text-gray-300">
+                      Changed <span className="font-bold">{log.field_changed}</span> from <span className="text-red-500">{String(log.old_value)}</span> to <span className="text-emerald-500 font-bold">{String(log.new_value)}</span>
+                    </p>
                   </div>
                 ))}
               </div>
             )}
-            <div className="flex justify-end pt-3 border-t border-gray-100 dark:border-[#1e1e21]">
-              <Button variant="outline" onClick={() => setAuditDialogInvoice(null)}>Close</Button>
-            </div>
           </div>
         </DialogContent>
       </Dialog>
     </div>
   );
-}
-
-function FileTextIcon({ className }: { className?: string }) {
-  return <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>;
 }
