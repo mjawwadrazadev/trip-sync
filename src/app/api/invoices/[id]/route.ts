@@ -137,3 +137,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return successResponse({ invoice });
   });
 }
+
+// DELETE /api/invoices/[id] - delete Draft or Voided invoices
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  return withAuth(async (user) => {
+    const { id } = await params;
+    const invoice = await Invoice.findOne({ _id: id, tenant_id: user.tenant_id });
+    if (!invoice) return errorResponse("Invoice not found", 404);
+
+    if (invoice.status === "Posted") {
+      return errorResponse("Posted invoices cannot be deleted to preserve financial audit trail. Please Void the invoice instead.", 400);
+    }
+
+    await InvoiceLineItem.deleteMany({ invoice_id: id });
+    await Invoice.deleteOne({ _id: id, tenant_id: user.tenant_id });
+
+    return successResponse({ message: "Invoice deleted successfully" });
+  });
+}

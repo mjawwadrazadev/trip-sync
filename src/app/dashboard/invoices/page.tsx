@@ -12,7 +12,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Send, Ban, CreditCard, Trash2, History, Loader2, Pencil, Printer, Plane, FileText, Calculator } from "lucide-react";
+import {
+  Plus, Send, Ban, CreditCard, Trash2, History, Loader2, Pencil,
+  Printer, Plane, FileText, Calculator, Search, X, RotateCcw, AlertTriangle
+} from "lucide-react";
 
 interface Invoice {
   _id: string;
@@ -21,9 +24,13 @@ interface Invoice {
   status: string;
   currency: string;
   total_amount: number;
+  paid_amount?: number;
+  due_amount?: number;
+  payment_status?: "Paid" | "Partial" | "Unpaid";
   bsp_flag: boolean;
   payment_mode?: string;
   remarks?: string;
+  print_name?: string;
   created_at: string;
 }
 
@@ -122,6 +129,19 @@ export default function InvoicesPage() {
   const [staffUsers, setStaffUsers] = useState<UserItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
+
+  // Search & Filter State
+  const [searchQuery, setSearchQuery] = useState("");
+  const [dateRangeFilter, setDateRangeFilter] = useState("all");
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [customerFilter, setCustomerFilter] = useState("all");
+
+  // Delete invoice state
+  const [deleteInvoiceId, setDeleteInvoiceId] = useState<string | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // Action dialogs state
   const [voidDialog, setVoidDialog] = useState<string | null>(null);
   const [voidReason, setVoidReason] = useState("");
   const [creditDialog, setCreditDialog] = useState<string | null>(null);
@@ -252,39 +272,82 @@ export default function InvoicesPage() {
 
   const isManager = ["Owner", "Accountant"].includes((session?.user as { role?: string })?.role || "");
 
+  // Load Invoices with Search and Filter Parameters
   const loadInvoices = useCallback(async () => {
     setLoading(true);
-    const url = typeFilter ? `/api/invoices?type=${typeFilter}` : "/api/invoices";
+    const params = new URLSearchParams();
+    if (typeFilter) params.set("type", typeFilter);
+    if (searchQuery.trim()) params.set("search", searchQuery.trim());
+    if (dateRangeFilter && dateRangeFilter !== "all") params.set("date_range", dateRangeFilter);
+    if (paymentStatusFilter && paymentStatusFilter !== "all") params.set("payment_status", paymentStatusFilter);
+    if (statusFilter && statusFilter !== "all") params.set("status", statusFilter);
+    if (customerFilter && customerFilter !== "all") params.set("customer_id", customerFilter);
+
+    const url = `/api/invoices?${params.toString()}`;
     const res = await fetch(url);
     const data = await res.json();
     setInvoices(data.invoices || []);
     setLoading(false);
-  }, [typeFilter]);
+  }, [typeFilter, searchQuery, dateRangeFilter, paymentStatusFilter, statusFilter, customerFilter]);
 
   useEffect(() => {
-    loadInvoices();
+    const timer = setTimeout(() => {
+      loadInvoices();
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [loadInvoices]);
+
+  useEffect(() => {
     fetch("/api/customers").then((r) => r.json()).then((d) => setCustomers(d.customers || []));
     fetch("/api/suppliers").then((r) => r.json()).then((d) => setSuppliers(d.suppliers || []));
     fetch("/api/users").then((r) => r.json()).then((d) => setStaffUsers(d.users || []));
-  }, [loadInvoices]);
+  }, []);
 
-  // Helper function to resolve Customer Name
+  // Helper functions to resolve display names
   const getCustomerName = (id: string) => {
     const c = customers.find((item) => item._id === id);
     return c ? c.name : id ? id : "Select Customer";
   };
 
-  // Helper function to resolve Supplier Name
   const getSupplierName = (id: string) => {
     const s = suppliers.find((item) => item._id === id);
     return s ? `${s.name}${s.code ? ` (${s.code})` : ''}` : id ? id : "BSP / Airline";
   };
 
-  // Helper function to resolve SPO / Agent Name
   const getAgentName = (id: string) => {
     const u = staffUsers.find((item) => item._id === id);
     return u ? `${u.name} (${u.role})` : id ? id : "Booking Agent";
   };
+
+  // Reset all filters
+  const resetFilters = () => {
+    setSearchQuery("");
+    setDateRangeFilter("all");
+    setPaymentStatusFilter("all");
+    setStatusFilter("all");
+    setCustomerFilter("all");
+  };
+
+  // Delete invoice
+  async function confirmDeleteInvoice() {
+    if (!deleteInvoiceId) return;
+    setDeleteLoading(true);
+    try {
+      const res = await fetch(`/api/invoices/${deleteInvoiceId}`, { method: "DELETE" });
+      if (res.ok) {
+        setDeleteInvoiceId(null);
+        loadInvoices();
+      } else {
+        const d = await res.json();
+        alert(d.error || "Failed to delete invoice");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error deleting invoice");
+    } finally {
+      setDeleteLoading(false);
+    }
+  }
 
   // Calculations for Ticket Line Item
   function calculateTicketTotals(item: LineItemInput): LineItemInput {
@@ -542,6 +605,12 @@ export default function InvoicesPage() {
     Draft: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
     Posted: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400",
     Voided: "bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400",
+  };
+
+  const paymentStyles: Record<string, string> = {
+    Paid: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800/60",
+    Partial: "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 border border-amber-300 dark:border-amber-800/60",
+    Unpaid: "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400 border border-rose-300 dark:border-rose-800/60",
   };
 
   // Render Ticket Editor Component (matching ERP screen)
@@ -953,9 +1022,12 @@ export default function InvoicesPage() {
     );
   };
 
+  const hasActiveFilters = searchQuery || dateRangeFilter !== "all" || paymentStatusFilter !== "all" || statusFilter !== "all" || customerFilter !== "all";
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
+      {/* Page Header */}
+      <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-50">
             Invoices{typeFilter ? ` — ${typeFilter}s` : ""}
@@ -1104,9 +1176,151 @@ export default function InvoicesPage() {
         </Dialog>
       </div>
 
+      {/* Modern Search & Filters Bar */}
+      <Card className="bg-white dark:bg-[#111113] border-gray-200/80 dark:border-[#1e1e21] shadow-sm mb-5">
+        <CardContent className="p-4">
+          <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+            {/* Search Input */}
+            <div className="relative flex-1 min-w-[240px]">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <Input
+                placeholder="Search by invoice #, customer, passenger, ticket, PNR..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 pr-8 h-9 text-[13px] bg-slate-50/50 dark:bg-[#161619] border-slate-200 dark:border-slate-800"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Filter Dropdowns */}
+            <div className="flex flex-wrap items-center gap-2 text-[12px]">
+              {/* Date Range Filter */}
+              <div className="w-36">
+                <Select value={dateRangeFilter} onValueChange={(v) => setDateRangeFilter(v || "all")}>
+                  <SelectTrigger className="h-9 text-[12px] bg-slate-50/50 dark:bg-[#161619] border-slate-200 dark:border-slate-800">
+                    <SelectValue placeholder="Date Range">
+                      {(val) => {
+                        const labels: Record<string, string> = {
+                          all: "All Dates",
+                          today: "Today",
+                          this_week: "This Week",
+                          last_week: "Last Week",
+                          this_month: "This Month",
+                          last_month: "Last Month",
+                        };
+                        return labels[val] || "All Dates";
+                      }}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Dates</SelectItem>
+                    <SelectItem value="today">Today</SelectItem>
+                    <SelectItem value="this_week">This Week</SelectItem>
+                    <SelectItem value="last_week">Last Week</SelectItem>
+                    <SelectItem value="this_month">This Month</SelectItem>
+                    <SelectItem value="last_month">Last Month</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Payment Status Filter (Paid / Partial / Unpaid) */}
+              <div className="w-32">
+                <Select value={paymentStatusFilter} onValueChange={(v) => setPaymentStatusFilter(v || "all")}>
+                  <SelectTrigger className="h-9 text-[12px] bg-slate-50/50 dark:bg-[#161619] border-slate-200 dark:border-slate-800">
+                    <SelectValue placeholder="Payment">
+                      {(val) => {
+                        const labels: Record<string, string> = {
+                          all: "All Payments",
+                          Paid: "Paid",
+                          Partial: "Partial",
+                          Unpaid: "Unpaid",
+                        };
+                        return labels[val] || "All Payments";
+                      }}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Payments</SelectItem>
+                    <SelectItem value="Paid">Paid</SelectItem>
+                    <SelectItem value="Partial">Partial</SelectItem>
+                    <SelectItem value="Unpaid">Unpaid</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Status Filter (Draft / Posted / Voided) */}
+              <div className="w-32">
+                <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v || "all")}>
+                  <SelectTrigger className="h-9 text-[12px] bg-slate-50/50 dark:bg-[#161619] border-slate-200 dark:border-slate-800">
+                    <SelectValue placeholder="Status">
+                      {(val) => {
+                        const labels: Record<string, string> = {
+                          all: "All Status",
+                          Draft: "Draft",
+                          Posted: "Posted",
+                          Voided: "Voided",
+                        };
+                        return labels[val] || "All Status";
+                      }}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="Draft">Draft</SelectItem>
+                    <SelectItem value="Posted">Posted</SelectItem>
+                    <SelectItem value="Voided">Voided</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Customer Filter */}
+              <div className="w-44">
+                <Select value={customerFilter} onValueChange={(v) => setCustomerFilter(v || "all")}>
+                  <SelectTrigger className="h-9 text-[12px] bg-slate-50/50 dark:bg-[#161619] border-slate-200 dark:border-slate-800">
+                    <SelectValue placeholder="All Customers">
+                      {(val) => val === "all" ? "All Customers" : getCustomerName(val)}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Customers</SelectItem>
+                    {customers.map((c) => <SelectItem key={c._id} value={c._id}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Reset Filters Button */}
+              {hasActiveFilters && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={resetFilters}
+                  className="h-9 px-2 text-[12px] text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 gap-1"
+                  title="Reset all filters"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" /> Reset
+                </Button>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Invoices Table Card */}
       <Card className="bg-white dark:bg-[#111113] border-gray-200/80 dark:border-[#1e1e21] shadow-sm">
-        <CardHeader className="px-6 pt-5 pb-3">
-          <CardTitle className="text-[15px] font-semibold text-gray-900 dark:text-gray-50">Invoice Register</CardTitle>
+        <CardHeader className="px-6 pt-5 pb-3 flex flex-row items-center justify-between">
+          <CardTitle className="text-[15px] font-semibold text-gray-900 dark:text-gray-50 flex items-center gap-2">
+            <span>Invoice Register</span>
+            <Badge variant="secondary" className="text-[11px] font-mono font-normal">
+              {invoices.length} {invoices.length === 1 ? "invoice" : "invoices"}
+            </Badge>
+          </CardTitle>
         </CardHeader>
         <CardContent className="px-6 pb-5">
           {loading ? (
@@ -1120,9 +1334,11 @@ export default function InvoicesPage() {
                   <TableRow className="border-gray-100 dark:border-[#1e1e21]">
                     <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Invoice #</TableHead>
                     <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Customer</TableHead>
-                    <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Status</TableHead>
+                    <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Doc Status</TableHead>
+                    <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Payment</TableHead>
                     <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Currency</TableHead>
-                    <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 text-right">Amount</TableHead>
+                    <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 text-right">Total Amount</TableHead>
+                    <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 text-right">Due Balance</TableHead>
                     <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Pay Mode</TableHead>
                     <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Date</TableHead>
                     <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Actions</TableHead>
@@ -1130,47 +1346,95 @@ export default function InvoicesPage() {
                 </TableHeader>
                 <TableBody>
                   {invoices.length === 0 ? (
-                    <TableRow><TableCell colSpan={8} className="text-center py-12 text-[13px] text-gray-400">No invoices recorded yet.</TableCell></TableRow>
+                    <TableRow>
+                      <TableCell colSpan={10} className="text-center py-12 text-[13px] text-gray-400">
+                        {hasActiveFilters ? "No invoices found matching your filters. Try clearing filters." : "No invoices recorded yet."}
+                      </TableCell>
+                    </TableRow>
                   ) : invoices.map((inv) => (
                     <TableRow key={inv._id} className="border-gray-100 dark:border-[#1e1e21] hover:bg-gray-50/50 dark:hover:bg-[#151517]">
-                      <TableCell className="font-mono text-[13px] font-semibold text-gray-900 dark:text-gray-100">{inv.invoice_number}</TableCell>
-                      <TableCell className="text-[13px] text-gray-600 dark:text-gray-300">{typeof inv.customer_id === "object" ? inv.customer_id.name : "-"}</TableCell>
+                      <TableCell className="font-mono text-[13px] font-semibold text-gray-900 dark:text-gray-100">
+                        {inv.invoice_number}
+                      </TableCell>
+                      <TableCell className="text-[13px] text-gray-600 dark:text-gray-300">
+                        <div className="font-medium text-gray-900 dark:text-gray-100">
+                          {typeof inv.customer_id === "object" ? inv.customer_id.name : "-"}
+                        </div>
+                        {inv.print_name && inv.print_name !== (typeof inv.customer_id === "object" ? inv.customer_id.name : "") && (
+                          <span className="text-[11px] text-slate-400 block">{inv.print_name}</span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${statusStyles[inv.status] || ""}`}>
                           {inv.status}
                         </span>
                       </TableCell>
+                      <TableCell>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium ${paymentStyles[inv.payment_status || "Unpaid"] || ""}`}>
+                          {inv.payment_status || "Unpaid"}
+                        </span>
+                      </TableCell>
                       <TableCell className="text-[13px] text-gray-500">{inv.currency}</TableCell>
-                      <TableCell className="text-right font-mono text-[13px] font-semibold text-gray-900 dark:text-gray-100">{inv.total_amount.toLocaleString()}</TableCell>
+                      <TableCell className="text-right font-mono text-[13px] font-semibold text-gray-900 dark:text-gray-100">
+                        {inv.total_amount.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-[12px]">
+                        <span className={inv.due_amount && inv.due_amount > 0 ? "font-semibold text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"}>
+                          {(inv.due_amount ?? inv.total_amount).toLocaleString()}
+                        </span>
+                        {inv.paid_amount !== undefined && inv.paid_amount > 0 && (
+                          <span className="block text-[10px] text-slate-400">
+                            Paid: {inv.paid_amount.toLocaleString()}
+                          </span>
+                        )}
+                      </TableCell>
                       <TableCell><Badge variant="outline" className="text-[10px] font-mono">{inv.payment_mode || "CR"}</Badge></TableCell>
-                      <TableCell className="text-[13px] text-gray-500">{new Date(inv.created_at).toLocaleDateString()}</TableCell>
+                      <TableCell className="text-[12px] text-gray-500">{new Date(inv.created_at).toLocaleDateString()}</TableCell>
                       <TableCell>
                         <div className="flex gap-1.5 flex-wrap">
                           {inv.status === "Draft" && (
                             <>
-                              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-[12px]" onClick={() => postInvoice(inv._id)}>
+                              <Button size="sm" variant="outline" className="h-7 gap-1 text-[11px]" onClick={() => postInvoice(inv._id)}>
                                 <Send className="h-3 w-3" /> Post
                               </Button>
-                              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-[12px]" onClick={() => openEditDialog(inv)}>
+                              <Button size="sm" variant="outline" className="h-7 gap-1 text-[11px]" onClick={() => openEditDialog(inv)}>
                                 <Pencil className="h-3 w-3" /> Edit
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 gap-1 text-[11px] text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
+                                onClick={() => setDeleteInvoiceId(inv._id)}
+                              >
+                                <Trash2 className="h-3 w-3" /> Delete
                               </Button>
                             </>
                           )}
                           {inv.status === "Posted" && (
                             <>
-                              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-[12px] text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10" onClick={() => setVoidDialog(inv._id)}>
+                              <Button size="sm" variant="outline" className="h-7 gap-1 text-[11px] text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10" onClick={() => setVoidDialog(inv._id)}>
                                 <Ban className="h-3 w-3" /> Void
                               </Button>
-                              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-[12px]" onClick={() => setCreditDialog(inv._id)}>
+                              <Button size="sm" variant="outline" className="h-7 gap-1 text-[11px]" onClick={() => setCreditDialog(inv._id)}>
                                 <CreditCard className="h-3 w-3" /> Credit Note
                               </Button>
                             </>
                           )}
-                          <Button size="sm" variant="outline" className="h-8 gap-1.5 text-[12px]" onClick={() => window.open(`/dashboard/invoices/${inv._id}/print`, "_blank")}>
+                          {inv.status === "Voided" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 gap-1 text-[11px] text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
+                              onClick={() => setDeleteInvoiceId(inv._id)}
+                            >
+                              <Trash2 className="h-3 w-3" /> Delete
+                            </Button>
+                          )}
+                          <Button size="sm" variant="outline" className="h-7 gap-1 text-[11px]" onClick={() => window.open(`/dashboard/invoices/${inv._id}/print`, "_blank")}>
                             <Printer className="h-3 w-3" /> Print
                           </Button>
                           {isManager && (
-                            <Button size="sm" variant="outline" className="h-8 gap-1.5 text-[12px] cursor-pointer" onClick={() => loadAuditLogs(inv)}>
+                            <Button size="sm" variant="outline" className="h-7 gap-1 text-[11px] cursor-pointer" onClick={() => loadAuditLogs(inv)}>
                               <History className="h-3 w-3" /> Logs
                             </Button>
                           )}
@@ -1299,6 +1563,34 @@ export default function InvoicesPage() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deleteInvoiceId} onOpenChange={() => setDeleteInvoiceId(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold flex items-center gap-2 text-rose-600">
+              <AlertTriangle className="h-5 w-5" /> Delete Invoice
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <p className="text-[13px] text-gray-600 dark:text-gray-300">
+              Are you sure you want to permanently delete this invoice? All associated line items, flight legs, and tax breakdowns will be deleted.
+            </p>
+            <p className="text-[12px] font-semibold text-rose-600">
+              This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+              <Button variant="outline" onClick={() => setDeleteInvoiceId(null)} disabled={deleteLoading}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={confirmDeleteInvoice} disabled={deleteLoading} className="gap-2">
+                {deleteLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                Delete Permanently
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
