@@ -268,6 +268,24 @@ export default function InvoicesPage() {
     fetch("/api/users").then((r) => r.json()).then((d) => setStaffUsers(d.users || []));
   }, [loadInvoices]);
 
+  // Helper function to resolve Customer Name
+  const getCustomerName = (id: string) => {
+    const c = customers.find((item) => item._id === id);
+    return c ? c.name : id ? id : "Select Customer";
+  };
+
+  // Helper function to resolve Supplier Name
+  const getSupplierName = (id: string) => {
+    const s = suppliers.find((item) => item._id === id);
+    return s ? `${s.name}${s.code ? ` (${s.code})` : ''}` : id ? id : "BSP / Airline";
+  };
+
+  // Helper function to resolve SPO / Agent Name
+  const getAgentName = (id: string) => {
+    const u = staffUsers.find((item) => item._id === id);
+    return u ? `${u.name} (${u.role})` : id ? id : "Booking Agent";
+  };
+
   // Calculations for Ticket Line Item
   function calculateTicketTotals(item: LineItemInput): LineItemInput {
     const baseFare = parseFloat(item.base_fare || "0") || 0;
@@ -544,7 +562,11 @@ export default function InvoicesPage() {
           <div className="space-y-1">
             <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Pax Type *</Label>
             <Select value={item.pax_type || "A"} onValueChange={(v) => updateTicketLineItem(itemIdx, "pax_type", v || "A", isEdit)}>
-              <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
+                <SelectValue>
+                  {(val) => val === "A" ? "Adult (A)" : val === "C" ? "Child (C)" : val === "I" ? "Infant (I)" : val || "Adult (A)"}
+                </SelectValue>
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="A">Adult (A)</SelectItem>
                 <SelectItem value="C">Child (C)</SelectItem>
@@ -613,7 +635,9 @@ export default function InvoicesPage() {
           <div className="space-y-1">
             <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">GDS System</Label>
             <Select value={item.gds_name || "Amadeus"} onValueChange={(v) => updateTicketLineItem(itemIdx, "gds_name", v || "Amadeus", isEdit)}>
-              <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
+                <SelectValue>{(val) => val || "Amadeus"}</SelectValue>
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="Amadeus">Amadeus</SelectItem>
                 <SelectItem value="Sabre">Sabre</SelectItem>
@@ -626,7 +650,9 @@ export default function InvoicesPage() {
           <div className="space-y-1">
             <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Trip Type</Label>
             <Select value={item.trip_type || "International"} onValueChange={(v) => updateTicketLineItem(itemIdx, "trip_type", v || "International", isEdit)}>
-              <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
+                <SelectValue>{(val) => val || "International"}</SelectValue>
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="International">International</SelectItem>
                 <SelectItem value="Domestic">Domestic</SelectItem>
@@ -959,7 +985,11 @@ export default function InvoicesPage() {
                     const cust = customers.find(c => c._id === val);
                     if (cust) setNewPrintName(cust.name);
                   }}>
-                    <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]"><SelectValue placeholder="Customer" /></SelectTrigger>
+                    <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
+                      <SelectValue placeholder="Select Customer">
+                        {(val) => getCustomerName(val)}
+                      </SelectValue>
+                    </SelectTrigger>
                     <SelectContent>{customers.map((c) => <SelectItem key={c._id} value={c._id}>{c.name}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
@@ -970,14 +1000,20 @@ export default function InvoicesPage() {
                 <div className="space-y-1">
                   <Label className="text-[11px] font-semibold">Supplier / BSP</Label>
                   <Select value={newSupplierId} onValueChange={(v) => setNewSupplierId(v || "")}>
-                    <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]"><SelectValue placeholder="BSP / Airline" /></SelectTrigger>
+                    <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
+                      <SelectValue placeholder="BSP / Airline">
+                        {(val) => getSupplierName(val)}
+                      </SelectValue>
+                    </SelectTrigger>
                     <SelectContent>{suppliers.map((s) => <SelectItem key={s._id} value={s._id}>{s.name} {s.code ? `(${s.code})` : ''}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1">
                   <Label className="text-[11px] font-semibold">Payment Mode</Label>
                   <Select value={newPaymentMode} onValueChange={(v) => setNewPaymentMode(v || "CR")}>
-                    <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
+                      <SelectValue>{(val) => val === "CR" ? "CR (Credit)" : val || "CR"}</SelectValue>
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="CR">CR (Credit)</SelectItem>
                       <SelectItem value="Cash">Cash</SelectItem>
@@ -998,14 +1034,20 @@ export default function InvoicesPage() {
                 <div className="space-y-1">
                   <Label className="text-[11px] font-semibold">SPO / Agent</Label>
                   <Select value={newSpoId} onValueChange={(v) => setNewSpoId(v || "")}>
-                    <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]"><SelectValue placeholder="Booking Agent" /></SelectTrigger>
+                    <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
+                      <SelectValue placeholder="Booking Agent">
+                        {(val) => getAgentName(val)}
+                      </SelectValue>
+                    </SelectTrigger>
                     <SelectContent>{staffUsers.map((u) => <SelectItem key={u._id} value={u._id}>{u.name} ({u.role})</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1">
                   <Label className="text-[11px] font-semibold">Remarks</Label>
                   <Select value={newRemarks} onValueChange={(v) => setNewRemarks(v || "NORMAL")}>
-                    <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
+                      <SelectValue>{(val) => val || "NORMAL"}</SelectValue>
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="NORMAL">NORMAL</SelectItem>
                       <SelectItem value="REISSUE">REISSUE</SelectItem>
@@ -1159,7 +1201,11 @@ export default function InvoicesPage() {
                 <div className="space-y-1">
                   <Label className="text-[11px] font-semibold">Customer *</Label>
                   <Select value={editCustomerId} onValueChange={(v) => setEditCustomerId(v || "")}>
-                    <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
+                      <SelectValue placeholder="Select Customer">
+                        {(val) => getCustomerName(val)}
+                      </SelectValue>
+                    </SelectTrigger>
                     <SelectContent>{customers.map((c) => <SelectItem key={c._id} value={c._id}>{c.name}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
@@ -1170,14 +1216,20 @@ export default function InvoicesPage() {
                 <div className="space-y-1">
                   <Label className="text-[11px] font-semibold">Supplier / BSP</Label>
                   <Select value={editSupplierId} onValueChange={(v) => setEditSupplierId(v || "")}>
-                    <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]"><SelectValue placeholder="BSP / Airline" /></SelectTrigger>
+                    <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
+                      <SelectValue placeholder="BSP / Airline">
+                        {(val) => getSupplierName(val)}
+                      </SelectValue>
+                    </SelectTrigger>
                     <SelectContent>{suppliers.map((s) => <SelectItem key={s._id} value={s._id}>{s.name} {s.code ? `(${s.code})` : ''}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1">
                   <Label className="text-[11px] font-semibold">Payment Mode</Label>
                   <Select value={editPaymentMode} onValueChange={(v) => setEditPaymentMode(v || "CR")}>
-                    <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
+                      <SelectValue>{(val) => val === "CR" ? "CR (Credit)" : val || "CR"}</SelectValue>
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="CR">CR (Credit)</SelectItem>
                       <SelectItem value="Cash">Cash</SelectItem>
@@ -1188,9 +1240,22 @@ export default function InvoicesPage() {
                   </Select>
                 </div>
                 <div className="space-y-1">
+                  <Label className="text-[11px] font-semibold">SPO / Agent</Label>
+                  <Select value={editSpoId} onValueChange={(v) => setEditSpoId(v || "")}>
+                    <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
+                      <SelectValue placeholder="Booking Agent">
+                        {(val) => getAgentName(val)}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>{staffUsers.map((u) => <SelectItem key={u._id} value={u._id}>{u.name} ({u.role})</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
                   <Label className="text-[11px] font-semibold">Remarks</Label>
                   <Select value={editRemarks} onValueChange={(v) => setEditRemarks(v || "NORMAL")}>
-                    <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
+                      <SelectValue>{(val) => val || "NORMAL"}</SelectValue>
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="NORMAL">NORMAL</SelectItem>
                       <SelectItem value="REISSUE">REISSUE</SelectItem>
@@ -1206,10 +1271,6 @@ export default function InvoicesPage() {
                 <div className="space-y-1">
                   <Label className="text-[11px] font-semibold">Our XO</Label>
                   <Input value={editOurXo} onChange={(e) => setEditOurXo(e.target.value)} placeholder="E" className="h-8 text-[12px] bg-white dark:bg-[#161619]" />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[11px] font-semibold">Client XO</Label>
-                  <Input value={editClientXo} onChange={(e) => setEditClientXo(e.target.value)} placeholder="Client XO" className="h-8 text-[12px] bg-white dark:bg-[#161619]" />
                 </div>
               </div>
 
