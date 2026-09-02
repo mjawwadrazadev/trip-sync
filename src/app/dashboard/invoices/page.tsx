@@ -170,8 +170,8 @@ export default function InvoicesPage() {
     tour_code: "",
     issue_date: new Date().toISOString().split("T")[0],
     flight_segments: [
-      { city: "LHE", flight_no: "", booking_class: "Y", dep_date: "", dep_time: "", arr_time: "", fare_basis: "" },
-      { city: "DOH", flight_no: "", booking_class: "Y", dep_date: "", dep_time: "", arr_time: "", fare_basis: "" },
+      { city: "LHE", flight_no: "621", booking_class: "Y", dep_date: "", dep_time: "14:30", arr_time: "18:45", fare_basis: "KLE01PK" },
+      { city: "DOH", flight_no: "621", booking_class: "Y", dep_date: "", dep_time: "14:30", arr_time: "18:45", fare_basis: "KLE01PK" },
     ],
     base_fare: "0",
     tax_dof: "0",
@@ -233,7 +233,7 @@ export default function InvoicesPage() {
   const [editOurXo, setEditOurXo] = useState("");
   const [editClientXo, setEditClientXo] = useState("");
   const [editBsp, setEditBsp] = useState(false);
-  const [editBspBillingPeriod] = useState("");
+  const [editBspBillingPeriod, setEditBspBillingPeriod] = useState("");
   const [editLineItems, setEditLineItems] = useState<LineItemInput[]>([]);
 
   const loadAuditLogs = async (invoice: Invoice) => {
@@ -529,9 +529,9 @@ export default function InvoicesPage() {
   // Render Ticket Editor Component (matching ERP screen)
   const renderTicketForm = (item: LineItemInput, itemIdx: number, isEdit = false) => {
     return (
-      <div className="space-y-4 text-[12px] bg-slate-50/50 dark:bg-[#0c0c0e] p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-inner">
-        {/* Row 1: Passenger & Ticket Main Details */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+      <div className="space-y-3.5 text-[12px] bg-slate-50/50 dark:bg-[#0c0c0e] p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-inner">
+        {/* Row 1: Passenger Details (4 Columns) */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
           <div className="space-y-1">
             <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Pax Name *</Label>
             <Input
@@ -572,8 +572,8 @@ export default function InvoicesPage() {
           </div>
         </div>
 
-        {/* Row 2: Airline, Ticket No, PNR, GDS, Sector */}
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+        {/* Row 2: Airline, Ticket No, PNR, GDS, Sector (6 Columns) */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5">
           <div className="space-y-1">
             <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Ticket No *</Label>
             <Input
@@ -635,9 +635,9 @@ export default function InvoicesPage() {
           </div>
         </div>
 
-        {/* Flight Segments (Multi-Leg Table) */}
+        {/* Flight Segments (Multi-Leg Table) - Fluid Full Width */}
         <div className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden bg-white dark:bg-[#111113]">
-          <div className="bg-slate-100 dark:bg-slate-900 px-3 py-2 flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
+          <div className="bg-slate-100 dark:bg-slate-900 px-3 py-1.5 flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
             <span className="font-bold text-[11px] text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
               <Plane className="h-3.5 w-3.5 text-blue-600" /> Flight Routing &amp; Segments
             </span>
@@ -651,16 +651,16 @@ export default function InvoicesPage() {
               <Plus className="h-2.5 w-2.5" /> Add Leg
             </Button>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-[11px]">
+          <div className="w-full">
+            <table className="w-full text-[11px] table-auto">
               <thead className="bg-slate-50 dark:bg-[#161618] border-b border-slate-200 dark:border-slate-800 text-slate-500 font-semibold">
                 <tr>
-                  <th className="p-1.5 text-left">City</th>
-                  <th className="p-1.5 text-left">Fl. No</th>
-                  <th className="p-1.5 text-left">Cl</th>
-                  <th className="p-1.5 text-left">Dep Date</th>
-                  <th className="p-1.5 text-left">Dep Time</th>
-                  <th className="p-1.5 text-left">Arr Time</th>
+                  <th className="p-1.5 text-left w-24">City</th>
+                  <th className="p-1.5 text-left w-24">Fl. No</th>
+                  <th className="p-1.5 text-left w-16">Cl</th>
+                  <th className="p-1.5 text-left w-36">Dep Date</th>
+                  <th className="p-1.5 text-left w-28">Dep Time</th>
+                  <th className="p-1.5 text-left w-28">Arr Time</th>
                   <th className="p-1.5 text-left">Fare Basis</th>
                   <th className="p-1.5 text-center w-8"></th>
                 </tr>
@@ -673,7 +673,7 @@ export default function InvoicesPage() {
                         placeholder="LHE"
                         value={seg.city}
                         onChange={(e) => updateFlightSegment(itemIdx, segIdx, "city", e.target.value.toUpperCase(), isEdit)}
-                        className="h-7 text-[11px] uppercase font-mono w-20 bg-transparent"
+                        className="h-7 text-[11px] uppercase font-mono w-full bg-transparent"
                       />
                     </td>
                     <td className="p-1">
@@ -681,7 +681,7 @@ export default function InvoicesPage() {
                         placeholder="621"
                         value={seg.flight_no}
                         onChange={(e) => updateFlightSegment(itemIdx, segIdx, "flight_no", e.target.value, isEdit)}
-                        className="h-7 text-[11px] w-16 bg-transparent"
+                        className="h-7 text-[11px] w-full bg-transparent"
                       />
                     </td>
                     <td className="p-1">
@@ -689,7 +689,7 @@ export default function InvoicesPage() {
                         placeholder="Y"
                         value={seg.booking_class}
                         onChange={(e) => updateFlightSegment(itemIdx, segIdx, "booking_class", e.target.value.toUpperCase(), isEdit)}
-                        className="h-7 text-[11px] uppercase font-mono w-10 text-center bg-transparent"
+                        className="h-7 text-[11px] uppercase font-mono w-full text-center bg-transparent"
                       />
                     </td>
                     <td className="p-1">
@@ -697,7 +697,7 @@ export default function InvoicesPage() {
                         type="date"
                         value={seg.dep_date}
                         onChange={(e) => updateFlightSegment(itemIdx, segIdx, "dep_date", e.target.value, isEdit)}
-                        className="h-7 text-[11px] w-28 bg-transparent"
+                        className="h-7 text-[11px] w-full bg-transparent"
                       />
                     </td>
                     <td className="p-1">
@@ -705,7 +705,7 @@ export default function InvoicesPage() {
                         placeholder="14:30"
                         value={seg.dep_time}
                         onChange={(e) => updateFlightSegment(itemIdx, segIdx, "dep_time", e.target.value, isEdit)}
-                        className="h-7 text-[11px] font-mono w-16 bg-transparent"
+                        className="h-7 text-[11px] font-mono w-full bg-transparent"
                       />
                     </td>
                     <td className="p-1">
@@ -713,7 +713,7 @@ export default function InvoicesPage() {
                         placeholder="18:45"
                         value={seg.arr_time}
                         onChange={(e) => updateFlightSegment(itemIdx, segIdx, "arr_time", e.target.value, isEdit)}
-                        className="h-7 text-[11px] font-mono w-16 bg-transparent"
+                        className="h-7 text-[11px] font-mono w-full bg-transparent"
                       />
                     </td>
                     <td className="p-1">
@@ -721,7 +721,7 @@ export default function InvoicesPage() {
                         placeholder="KLE01PK"
                         value={seg.fare_basis}
                         onChange={(e) => updateFlightSegment(itemIdx, segIdx, "fare_basis", e.target.value.toUpperCase(), isEdit)}
-                        className="h-7 text-[11px] font-mono uppercase w-24 bg-transparent"
+                        className="h-7 text-[11px] font-mono uppercase w-full bg-transparent"
                       />
                     </td>
                     <td className="p-1 text-center">
@@ -743,9 +743,9 @@ export default function InvoicesPage() {
         </div>
 
         {/* Airfare, IATA Taxes & Deductions Matrix */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
           {/* Left: Taxes Breakdown Box */}
-          <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111113] space-y-2.5">
+          <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111113] space-y-2">
             <div className="font-bold text-[11px] text-slate-800 dark:text-slate-200 border-b pb-1 flex justify-between">
               <span>Airfare &amp; IATA Airline Taxes</span>
               <span className="font-mono text-blue-600">Base + Taxes</span>
@@ -825,7 +825,7 @@ export default function InvoicesPage() {
           </div>
 
           {/* Right: Commercials, Commission, WHT & Discounts */}
-          <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111113] space-y-2.5">
+          <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111113] space-y-2">
             <div className="font-bold text-[11px] text-slate-800 dark:text-slate-200 border-b pb-1 flex justify-between">
               <span>Commercials, WHT &amp; Profit Markup</span>
               <span className="font-mono text-emerald-600">Deductions</span>
@@ -897,7 +897,7 @@ export default function InvoicesPage() {
         </div>
 
         {/* Real-Time Accounting Totals Strip (matching ERP bottom right) */}
-        <div className="p-3 rounded-lg bg-slate-900 text-white flex flex-wrap items-center justify-between gap-4">
+        <div className="p-2.5 rounded-lg bg-slate-900 text-white flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-6 font-mono text-[12px]">
             <div>
               <span className="text-slate-400 text-[10px] block uppercase font-bold tracking-wider">Customer Gross</span>
@@ -940,7 +940,7 @@ export default function InvoicesPage() {
           <DialogTrigger className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-[13px] font-medium text-primary-foreground hover:bg-primary/90 shadow-sm transition-colors">
             <Plus className="h-4 w-4" /> New Invoice / Ticket Sale
           </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto w-full">
+          <DialogContent className="sm:max-w-[96vw] md:max-w-[94vw] lg:max-w-[1400px] w-[96vw] max-h-[96vh] overflow-y-auto p-5">
             <DialogHeader>
               <DialogTitle className="text-lg font-bold flex items-center gap-2">
                 <FileText className="h-5 w-5 text-primary" />
@@ -948,9 +948,9 @@ export default function InvoicesPage() {
               </DialogTitle>
             </DialogHeader>
 
-            <div className="space-y-4 pt-1">
-              {/* Top Invoice Header Grid (Matching ERP Header) */}
-              <div className="p-3.5 bg-slate-100/70 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-800 grid grid-cols-2 md:grid-cols-4 gap-3 text-[12px]">
+            <div className="space-y-3.5 pt-1">
+              {/* Top Invoice Header Grid: 8 Columns across desktop for zero vertical waste */}
+              <div className="p-3 bg-slate-100/70 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-800 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5 text-[12px]">
                 <div className="space-y-1">
                   <Label className="text-[11px] font-semibold">Customer *</Label>
                   <Select value={newCustomerId} onValueChange={(v) => {
@@ -959,18 +959,18 @@ export default function InvoicesPage() {
                     const cust = customers.find(c => c._id === val);
                     if (cust) setNewPrintName(cust.name);
                   }}>
-                    <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]"><SelectValue placeholder="Select Customer" /></SelectTrigger>
+                    <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]"><SelectValue placeholder="Customer" /></SelectTrigger>
                     <SelectContent>{customers.map((c) => <SelectItem key={c._id} value={c._id}>{c.name}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1">
                   <Label className="text-[11px] font-semibold">Print Name</Label>
-                  <Input value={newPrintName} onChange={(e) => setNewPrintName(e.target.value)} placeholder="Customer Print Name" className="h-8 text-[12px] bg-white dark:bg-[#161619]" />
+                  <Input value={newPrintName} onChange={(e) => setNewPrintName(e.target.value)} placeholder="Print Name" className="h-8 text-[12px] bg-white dark:bg-[#161619]" />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-[11px] font-semibold">Supplier / BSP</Label>
                   <Select value={newSupplierId} onValueChange={(v) => setNewSupplierId(v || "")}>
-                    <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]"><SelectValue placeholder="Bank Settlement Plan" /></SelectTrigger>
+                    <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]"><SelectValue placeholder="BSP / Airline" /></SelectTrigger>
                     <SelectContent>{suppliers.map((s) => <SelectItem key={s._id} value={s._id}>{s.name} {s.code ? `(${s.code})` : ''}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
@@ -987,7 +987,6 @@ export default function InvoicesPage() {
                     </SelectContent>
                   </Select>
                 </div>
-
                 <div className="space-y-1">
                   <Label className="text-[11px] font-semibold">Inv Date</Label>
                   <Input type="date" value={newInvDate} onChange={(e) => setNewInvDate(e.target.value)} className="h-8 text-[12px] bg-white dark:bg-[#161619]" />
@@ -1144,9 +1143,9 @@ export default function InvoicesPage() {
         </CardContent>
       </Card>
 
-      {/* Edit Invoice Dialog */}
+      {/* Edit Invoice Dialog - Wide and Tall */}
       <Dialog open={!!editInvoiceId} onOpenChange={(open) => !open && setEditInvoiceId(null)}>
-        <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto w-full">
+        <DialogContent className="sm:max-w-[96vw] md:max-w-[94vw] lg:max-w-[1400px] w-[96vw] max-h-[96vh] overflow-y-auto p-5">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold flex items-center gap-2">
               <Pencil className="h-5 w-5 text-primary" /> Edit Ticket Invoice
@@ -1155,8 +1154,8 @@ export default function InvoicesPage() {
           {editLoading ? (
             <div className="flex items-center justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
           ) : (
-            <div className="space-y-4 pt-1">
-              <div className="p-3.5 bg-slate-100/70 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-800 grid grid-cols-2 md:grid-cols-4 gap-3 text-[12px]">
+            <div className="space-y-3.5 pt-1">
+              <div className="p-3 bg-slate-100/70 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-800 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5 text-[12px]">
                 <div className="space-y-1">
                   <Label className="text-[11px] font-semibold">Customer *</Label>
                   <Select value={editCustomerId} onValueChange={(v) => setEditCustomerId(v || "")}>
@@ -1167,6 +1166,13 @@ export default function InvoicesPage() {
                 <div className="space-y-1">
                   <Label className="text-[11px] font-semibold">Print Name</Label>
                   <Input value={editPrintName} onChange={(e) => setEditPrintName(e.target.value)} className="h-8 text-[12px] bg-white dark:bg-[#161619]" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-semibold">Supplier / BSP</Label>
+                  <Select value={editSupplierId} onValueChange={(v) => setEditSupplierId(v || "")}>
+                    <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]"><SelectValue placeholder="BSP / Airline" /></SelectTrigger>
+                    <SelectContent>{suppliers.map((s) => <SelectItem key={s._id} value={s._id}>{s.name} {s.code ? `(${s.code})` : ''}</SelectItem>)}</SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-1">
                   <Label className="text-[11px] font-semibold">Payment Mode</Label>
@@ -1192,6 +1198,18 @@ export default function InvoicesPage() {
                       <SelectItem value="DATE CHANGE">DATE CHANGE</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-semibold">Cost Center</Label>
+                  <Input value={editCostCenter} onChange={(e) => setEditCostCenter(e.target.value)} placeholder="Cost Center" className="h-8 text-[12px] bg-white dark:bg-[#161619]" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-semibold">Our XO</Label>
+                  <Input value={editOurXo} onChange={(e) => setEditOurXo(e.target.value)} placeholder="E" className="h-8 text-[12px] bg-white dark:bg-[#161619]" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-semibold">Client XO</Label>
+                  <Input value={editClientXo} onChange={(e) => setEditClientXo(e.target.value)} placeholder="Client XO" className="h-8 text-[12px] bg-white dark:bg-[#161619]" />
                 </div>
               </div>
 
