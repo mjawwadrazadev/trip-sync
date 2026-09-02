@@ -62,7 +62,6 @@ const navItems: NavItem[] = [
       { href: "/dashboard/invoices?type=Other", label: "Others", type: "Other" },
     ],
   },
-  { href: "/dashboard/bookings", label: "Bookings", icon: Calendar },
   { href: "/dashboard/customers", label: "Customers", icon: Users },
   { href: "/dashboard/suppliers", label: "Suppliers", icon: Building2 },
   { href: "/dashboard/payments", label: "Payments", icon: Wallet },

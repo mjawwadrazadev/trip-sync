@@ -141,6 +141,10 @@ export default function InvoicesPage() {
   const [deleteInvoiceId, setDeleteInvoiceId] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
+  // Double-submission protection states
+  const [isCreating, setIsCreating] = useState(false);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
   // Action dialogs state
   const [voidDialog, setVoidDialog] = useState<string | null>(null);
   const [voidReason, setVoidReason] = useState("");
@@ -442,35 +446,44 @@ export default function InvoicesPage() {
   }
 
   async function createInvoice() {
-    const res = await fetch("/api/invoices", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        customer_id: newCustomerId,
-        currency: newCurrency,
-        bsp_flag: newBsp,
-        bsp_billing_period: newBspBillingPeriod || null,
-        payment_mode: newPaymentMode,
-        remarks: newRemarks,
-        visit_type: newVisitType,
-        spo_id: newSpoId || null,
-        supplier_id: newSupplierId || null,
-        print_name: newPrintName,
-        cost_center: newCostCenter,
-        adj_date: newAdjDate,
-        our_xo: newOurXo,
-        client_xo: newClientXo,
-        line_items: lineItems,
-      }),
-    });
-    if (res.ok) {
-      setShowNew(false);
-      setNewCustomerId("");
-      setLineItems([defaultType === "Ticket" ? createDefaultTicketItem() : { service_type: defaultType, description: "", amount: "", commission_override_rate: "", tax_code_id: "" }]);
-      loadInvoices();
-    } else {
-      const d = await res.json();
-      alert(d.error || "Failed to create invoice");
+    if (isCreating) return;
+    setIsCreating(true);
+    try {
+      const res = await fetch("/api/invoices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customer_id: newCustomerId,
+          currency: newCurrency,
+          bsp_flag: newBsp,
+          bsp_billing_period: newBspBillingPeriod || null,
+          payment_mode: newPaymentMode,
+          remarks: newRemarks,
+          visit_type: newVisitType,
+          spo_id: newSpoId || null,
+          supplier_id: newSupplierId || null,
+          print_name: newPrintName,
+          cost_center: newCostCenter,
+          adj_date: newAdjDate,
+          our_xo: newOurXo,
+          client_xo: newClientXo,
+          line_items: lineItems,
+        }),
+      });
+      if (res.ok) {
+        setShowNew(false);
+        setNewCustomerId("");
+        setLineItems([defaultType === "Ticket" ? createDefaultTicketItem() : { service_type: defaultType, description: "", amount: "", commission_override_rate: "", tax_code_id: "" }]);
+        loadInvoices();
+      } else {
+        const d = await res.json();
+        alert(d.error || "Failed to create invoice");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("An unexpected error occurred while creating invoice.");
+    } finally {
+      setIsCreating(false);
     }
   }
 
@@ -574,31 +587,39 @@ export default function InvoicesPage() {
   }
 
   async function saveEditInvoice() {
-    if (!editInvoiceId) return;
-    const res = await fetch(`/api/invoices/${editInvoiceId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        customer_id: editCustomerId,
-        currency: editCurrency,
-        bsp_flag: editBsp,
-        bsp_billing_period: editBspBillingPeriod || null,
-        payment_mode: editPaymentMode,
-        remarks: editRemarks,
-        visit_type: editVisitType,
-        spo_id: editSpoId || null,
-        supplier_id: editSupplierId || null,
-        print_name: editPrintName,
-        cost_center: editCostCenter,
-        adj_date: editAdjDate,
-        our_xo: editOurXo,
-        client_xo: editClientXo,
-        line_items: editLineItems,
-      }),
-    });
-    if (!res.ok) { const d = await res.json(); alert(d.error || "Failed to save"); return; }
-    setEditInvoiceId(null);
-    loadInvoices();
+    if (!editInvoiceId || isSavingEdit) return;
+    setIsSavingEdit(true);
+    try {
+      const res = await fetch(`/api/invoices/${editInvoiceId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customer_id: editCustomerId,
+          currency: editCurrency,
+          bsp_flag: editBsp,
+          bsp_billing_period: editBspBillingPeriod || null,
+          payment_mode: editPaymentMode,
+          remarks: editRemarks,
+          visit_type: editVisitType,
+          spo_id: editSpoId || null,
+          supplier_id: editSupplierId || null,
+          print_name: editPrintName,
+          cost_center: editCostCenter,
+          adj_date: editAdjDate,
+          our_xo: editOurXo,
+          client_xo: editClientXo,
+          line_items: editLineItems,
+        }),
+      });
+      if (!res.ok) { const d = await res.json(); alert(d.error || "Failed to save"); return; }
+      setEditInvoiceId(null);
+      loadInvoices();
+    } catch (err) {
+      console.error(err);
+      alert("Error saving invoice changes");
+    } finally {
+      setIsSavingEdit(false);
+    }
   }
 
   const statusStyles: Record<string, string> = {
@@ -1167,8 +1188,9 @@ export default function InvoicesPage() {
 
               <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
                 <Button variant="outline" onClick={() => setShowNew(false)}>Cancel</Button>
-                <Button onClick={createInvoice} disabled={!newCustomerId || lineItems.length === 0} className="gap-2">
-                  <FileText className="h-4 w-4" /> Save Invoice
+                <Button onClick={createInvoice} disabled={!newCustomerId || lineItems.length === 0 || isCreating} className="gap-2">
+                  {isCreating ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+                  {isCreating ? "Saving..." : "Save Invoice"}
                 </Button>
               </div>
             </div>
@@ -1559,7 +1581,10 @@ export default function InvoicesPage() {
 
               <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
                 <Button variant="outline" onClick={() => setEditInvoiceId(null)}>Cancel</Button>
-                <Button onClick={saveEditInvoice} className="gap-2">Save Changes</Button>
+                <Button onClick={saveEditInvoice} disabled={isSavingEdit} className="gap-2">
+                  {isSavingEdit ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  {isSavingEdit ? "Saving..." : "Save Changes"}
+                </Button>
               </div>
             </div>
           )}

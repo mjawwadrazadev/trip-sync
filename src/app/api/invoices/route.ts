@@ -164,6 +164,52 @@ export async function POST(req: NextRequest) {
       return errorResponse("customer_id and line_items are required");
     }
 
+    // 1. Duplicate Ticket Number Protection across non-voided invoices
+    for (const item of line_items) {
+      if (item.ticket_number && String(item.ticket_number).trim()) {
+        const cleanTicket = String(item.ticket_number).trim();
+        const existingLines = await InvoiceLineItem.find({
+          tenant_id: user.tenant_id,
+          ticket_number: cleanTicket,
+        }).select("invoice_id").lean();
+
+        if (existingLines.length > 0) {
+          const invIds = existingLines.map((l) => l.invoice_id);
+          const existingInv = await Invoice.findOne({
+            _id: { $in: invIds },
+            tenant_id: user.tenant_id,
+            status: { $ne: "Voided" },
+          }).lean();
+
+          if (existingInv) {
+            return errorResponse(
+              `Duplicate Error: Ticket #${cleanTicket} is already invoiced under Invoice #${existingInv.invoice_number}. Cannot invoice the same ticket twice.`,
+              400
+            );
+          }
+        }
+      }
+    }
+
+    // Calculate total amount from line items
+    const total_amount = line_items.reduce((sum: number, item: { amount?: number; customer_net?: number }) => {
+      const amt = item.customer_net !== undefined && item.customer_net > 0 ? item.customer_net : (parseFloat(String(item.amount)) || 0);
+      return sum + amt;
+    }, 0);
+
+    // 2. Anti-Rapid Duplicate / Double-Click Protection (within 3 seconds)
+    const recentDuplicate = await Invoice.findOne({
+      tenant_id: user.tenant_id,
+      customer_id,
+      total_amount,
+      created_by: user.user_id,
+      created_at: { $gte: new Date(Date.now() - 3000) },
+    }).lean();
+
+    if (recentDuplicate) {
+      return errorResponse("Duplicate invoice submission detected. Please do not double-click Save.", 400);
+    }
+
     // Generate sequential invoice number
     const tenant = await Tenant.findById(user.tenant_id);
     if (!tenant) return errorResponse("Tenant not found", 404);
@@ -179,12 +225,6 @@ export async function POST(req: NextRequest) {
     }
 
     const invoice_number = `${tenant.invoice_prefix}-${String(nextNum).padStart(6, "0")}`;
-
-    // Calculate total amount from line items
-    const total_amount = line_items.reduce((sum: number, item: { amount?: number; customer_net?: number }) => {
-      const amt = item.customer_net !== undefined && item.customer_net > 0 ? item.customer_net : (parseFloat(String(item.amount)) || 0);
-      return sum + amt;
-    }, 0);
 
     const invoice = await Invoice.create({
       tenant_id: user.tenant_id,
