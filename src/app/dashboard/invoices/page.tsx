@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Textarea } from "@/components/ui/textarea";
 import {
   Plus, Send, Ban, CreditCard, Trash2, History, Loader2, Pencil,
-  Printer, Plane, FileText, Calculator, Search, X, RotateCcw, AlertTriangle
+  Printer, Plane, FileText, Calculator, Search, X, RotateCcw, AlertTriangle, Check
 } from "lucide-react";
 
 interface Invoice {
@@ -31,6 +31,7 @@ interface Invoice {
   payment_mode?: string;
   remarks?: string;
   print_name?: string;
+  cost_center?: string;
   created_at: string;
 }
 
@@ -48,6 +49,11 @@ interface FlightSegment {
   fare_basis: string;
 }
 
+interface DynamicTaxItem {
+  code: string;
+  amount: string;
+}
+
 interface LineItemInput {
   service_type: string;
   description: string;
@@ -55,13 +61,14 @@ interface LineItemInput {
   commission_override_rate: string;
   tax_code_id: string;
   
-  // Ticketing specific
+  // Passenger & Airline Details (Green-ticked in ERP screenshot)
   pax_name?: string;
   pax_type?: string;
   passport_no?: string;
   passport_issue_date?: string;
   ticket_number?: string;
   conjunction_ticket_no?: string;
+  conjunction_route?: string;
   gds_pnr?: string;
   gds_name?: string;
   airline_name?: string;
@@ -71,8 +78,14 @@ interface LineItemInput {
   doc_type?: string;
   tour_code?: string;
   issue_date?: string;
+  our_xo?: string;
   flight_segments?: FlightSegment[];
   
+  // Dynamic Taxes (Top of Right Box)
+  airline_city_taxes?: DynamicTaxItem[];
+  city_taxes?: DynamicTaxItem[];
+
+  // 14 IATA Standard Airline Taxes
   base_fare?: string;
   tax_dof?: string;
   tax_yq?: string;
@@ -91,21 +104,30 @@ interface LineItemInput {
   tax_airline_city?: string;
   other_taxes?: string;
 
+  // Commercials & Deductions Matrix
   wht_percent?: string;
   wht_amount?: string;
   commission_percent?: string;
   commission_amount?: string;
   discount_percent?: string;
   discount_amount?: string;
+  psf_percent?: string;
   psf_amount?: string;
   gst_percent?: string;
   gst_amount?: string;
+  auto_update?: boolean;
 
+  // Cancellation Charges
+  cancellation_charges_self?: string;
+  cancellation_charges_supplier?: string;
+
+  // 2-Sided Accounting Totals
   supplier_id?: string;
   customer_gross?: number;
   customer_net?: number;
   supplier_gross?: number;
   supplier_net?: number;
+  supplier_gross_wo_wht?: number;
   agency_margin?: number;
 }
 
@@ -152,26 +174,27 @@ export default function InvoicesPage() {
   const [creditAmount, setCreditAmount] = useState("");
   const [creditReason, setCreditReason] = useState("");
 
-  // Invoice Header State
+  // Invoice Header State (Green-ticked in ERP screenshot)
   const [newCustomerId, setNewCustomerId] = useState("");
   const [newCurrency] = useState("PKR");
   const [newPaymentMode, setNewPaymentMode] = useState("CR");
   const [newRemarks, setNewRemarks] = useState("NORMAL");
-  const [newVisitType] = useState("Visitor");
+  const [newVisitType, setNewVisitType] = useState("Visitor");
   const [newSpoId, setNewSpoId] = useState("");
   const [newSupplierId, setNewSupplierId] = useState("");
   const [newPrintName, setNewPrintName] = useState("");
-  const [newCostCenter] = useState("");
+  const [newCostCenter, setNewCostCenter] = useState("");
   const [newInvDate, setNewInvDate] = useState(new Date().toISOString().split("T")[0]);
   const [newAdjDate, setNewAdjDate] = useState(new Date().toISOString().split("T")[0]);
-  const [newOurXo] = useState("E");
-  const [newClientXo] = useState("");
+  const [newOurXo, setNewOurXo] = useState("E");
+  const [newClientXo, setNewClientXo] = useState("");
+  const [newDocStatus, setNewDocStatus] = useState("Draft");
   const [newBsp] = useState(false);
   const [newBspBillingPeriod] = useState("");
 
   const defaultType = (typeFilter && typeFilter !== "Other") ? typeFilter : "Ticket";
 
-  // Ticket Line item helper
+  // Ticket Line item default matching ERP screenshot exactly
   const createDefaultTicketItem = (): LineItemInput => ({
     service_type: "Ticket",
     description: "",
@@ -184,6 +207,7 @@ export default function InvoicesPage() {
     passport_issue_date: "",
     ticket_number: "",
     conjunction_ticket_no: "",
+    conjunction_route: "",
     gds_pnr: "",
     gds_name: "Amadeus",
     airline_name: "",
@@ -192,13 +216,20 @@ export default function InvoicesPage() {
     trip_type: "International",
     doc_type: "BSPD",
     tour_code: "",
+    our_xo: "E",
     issue_date: new Date().toISOString().split("T")[0],
     flight_segments: [
-      { city: "LHE", flight_no: "621", booking_class: "Y", dep_date: "", dep_time: "14:30", arr_time: "18:45", fare_basis: "KLE01PK" },
-      { city: "DOH", flight_no: "621", booking_class: "Y", dep_date: "", dep_time: "14:30", arr_time: "18:45", fare_basis: "KLE01PK" },
+      { city: "LHE", flight_no: "621", booking_class: "Y", dep_date: "", dep_time: "", arr_time: "", fare_basis: "KLE01PK" },
+      { city: "DOH", flight_no: "621", booking_class: "Y", dep_date: "", dep_time: "", arr_time: "", fare_basis: "KLE01PK" },
     ],
-    base_fare: "0",
-    tax_dof: "0",
+    airline_city_taxes: [
+      { code: "XT", amount: "0" },
+    ],
+    city_taxes: [
+      { code: "City Tax", amount: "0" },
+    ],
+    base_fare: "37024",
+    tax_dof: "976",
     tax_yq: "0",
     tax_yr: "0",
     tax_rg: "0",
@@ -220,14 +251,19 @@ export default function InvoicesPage() {
     commission_amount: "0",
     discount_percent: "0",
     discount_amount: "0",
+    psf_percent: "0",
     psf_amount: "0",
     gst_percent: "5",
     gst_amount: "0",
-    customer_gross: 0,
-    customer_net: 0,
-    supplier_gross: 0,
-    supplier_net: 0,
-    agency_margin: 0,
+    auto_update: true,
+    cancellation_charges_self: "0",
+    cancellation_charges_supplier: "0",
+    customer_gross: 38000,
+    customer_net: 38000,
+    supplier_gross: 37024,
+    supplier_net: 37024,
+    supplier_gross_wo_wht: 37024,
+    agency_margin: 976,
   });
 
   const [lineItems, setLineItems] = useState<LineItemInput[]>([
@@ -256,6 +292,7 @@ export default function InvoicesPage() {
   const [editAdjDate, setEditAdjDate] = useState("");
   const [editOurXo, setEditOurXo] = useState("");
   const [editClientXo, setEditClientXo] = useState("");
+  const [editDocStatus, setEditDocStatus] = useState("Draft");
   const [editBsp, setEditBsp] = useState(false);
   const [editBspBillingPeriod, setEditBspBillingPeriod] = useState("");
   const [editLineItems, setEditLineItems] = useState<LineItemInput[]>([]);
@@ -353,9 +390,20 @@ export default function InvoicesPage() {
     }
   }
 
-  // Calculations for Ticket Line Item
+  // Dual-Sided Travel Accounting Calculations (Matching ERP Screenshot Exactly)
   function calculateTicketTotals(item: LineItemInput): LineItemInput {
     const baseFare = parseFloat(item.base_fare || "0") || 0;
+    
+    // Dynamic Airline City Tax Sum
+    const airlineCityTaxSum = (item.airline_city_taxes || []).reduce(
+      (sum, t) => sum + (parseFloat(t.amount || "0") || 0), 0
+    );
+
+    // Dynamic City Tax Sum
+    const cityTaxSum = (item.city_taxes || []).reduce(
+      (sum, t) => sum + (parseFloat(t.amount || "0") || 0), 0
+    );
+
     const taxes = (parseFloat(item.tax_dof || "0") || 0) +
       (parseFloat(item.tax_yq || "0") || 0) +
       (parseFloat(item.tax_yr || "0") || 0) +
@@ -371,7 +419,9 @@ export default function InvoicesPage() {
       (parseFloat(item.tax_rn || "0") || 0) +
       (parseFloat(item.tax_city || "0") || 0) +
       (parseFloat(item.tax_airline_city || "0") || 0) +
-      (parseFloat(item.other_taxes || "0") || 0);
+      (parseFloat(item.other_taxes || "0") || 0) +
+      airlineCityTaxSum +
+      cityTaxSum;
 
     const grossFare = baseFare + taxes;
     const commPct = parseFloat(item.commission_percent || "0") || 0;
@@ -383,15 +433,20 @@ export default function InvoicesPage() {
     const disPct = parseFloat(item.discount_percent || "0") || 0;
     const disAmt = (grossFare * disPct) / 100;
 
-    const psf = parseFloat(item.psf_amount || "0") || 0;
-    const gstPct = parseFloat(item.gst_percent || "0") || 0;
-    const gstAmt = (psf * gstPct) / 100;
+    const psfFlat = parseFloat(item.psf_amount || "0") || 0;
+    const psfPct = parseFloat(item.psf_percent || "0") || 0;
+    const psfPctAmt = (grossFare * psfPct) / 100;
+    const totalPsf = psfFlat + psfPctAmt;
 
-    const customerGross = grossFare + psf;
+    const gstPct = parseFloat(item.gst_percent || "0") || 0;
+    const gstAmt = (totalPsf * gstPct) / 100;
+
+    const customerGross = grossFare + totalPsf;
     const customerNet = customerGross - disAmt + gstAmt;
 
     const supplierGross = grossFare;
     const supplierNet = supplierGross - commAmt + whtAmt;
+    const supplierGrossWoWht = supplierGross - whtAmt;
 
     const margin = customerNet - supplierNet;
 
@@ -405,20 +460,24 @@ export default function InvoicesPage() {
       customer_net: Math.round(customerNet),
       supplier_gross: Math.round(supplierGross),
       supplier_net: Math.round(supplierNet),
+      supplier_gross_wo_wht: Math.round(supplierGrossWoWht),
       agency_margin: Math.round(margin),
       amount: String(Math.round(customerNet)),
     };
   }
 
-  function updateTicketLineItem(index: number, field: string, value: string | number | FlightSegment[] | undefined, isEdit = false) {
+  function updateTicketLineItem(index: number, field: string, value: unknown, isEdit = false) {
     const list = isEdit ? [...editLineItems] : [...lineItems];
     let item = { ...list[index], [field]: value };
-    item = calculateTicketTotals(item);
+    if (item.auto_update !== false) {
+      item = calculateTicketTotals(item);
+    }
     list[index] = item;
     if (isEdit) setEditLineItems(list);
     else setLineItems(list);
   }
 
+  // Flight Segments Helpers
   function addFlightSegment(index: number, isEdit = false) {
     const list = isEdit ? [...editLineItems] : [...lineItems];
     const segs = [...(list[index].flight_segments || [])];
@@ -445,6 +504,60 @@ export default function InvoicesPage() {
     else setLineItems(list);
   }
 
+  // Dynamic Airline City Tax Helpers
+  function addAirlineCityTax(itemIdx: number, isEdit = false) {
+    const list = isEdit ? [...editLineItems] : [...lineItems];
+    const current = [...(list[itemIdx].airline_city_taxes || [])];
+    current.push({ code: "XT", amount: "0" });
+    list[itemIdx] = calculateTicketTotals({ ...list[itemIdx], airline_city_taxes: current });
+    if (isEdit) setEditLineItems(list);
+    else setLineItems(list);
+  }
+
+  function removeAirlineCityTax(itemIdx: number, taxIdx: number, isEdit = false) {
+    const list = isEdit ? [...editLineItems] : [...lineItems];
+    const current = (list[itemIdx].airline_city_taxes || []).filter((_, i) => i !== taxIdx);
+    list[itemIdx] = calculateTicketTotals({ ...list[itemIdx], airline_city_taxes: current });
+    if (isEdit) setEditLineItems(list);
+    else setLineItems(list);
+  }
+
+  function updateAirlineCityTax(itemIdx: number, taxIdx: number, field: "code" | "amount", val: string, isEdit = false) {
+    const list = isEdit ? [...editLineItems] : [...lineItems];
+    const current = [...(list[itemIdx].airline_city_taxes || [])];
+    current[taxIdx] = { ...current[taxIdx], [field]: val };
+    list[itemIdx] = calculateTicketTotals({ ...list[itemIdx], airline_city_taxes: current });
+    if (isEdit) setEditLineItems(list);
+    else setLineItems(list);
+  }
+
+  // Dynamic City Tax Helpers
+  function addCityTax(itemIdx: number, isEdit = false) {
+    const list = isEdit ? [...editLineItems] : [...lineItems];
+    const current = [...(list[itemIdx].city_taxes || [])];
+    current.push({ code: "City Tax", amount: "0" });
+    list[itemIdx] = calculateTicketTotals({ ...list[itemIdx], city_taxes: current });
+    if (isEdit) setEditLineItems(list);
+    else setLineItems(list);
+  }
+
+  function removeCityTax(itemIdx: number, taxIdx: number, isEdit = false) {
+    const list = isEdit ? [...editLineItems] : [...lineItems];
+    const current = (list[itemIdx].city_taxes || []).filter((_, i) => i !== taxIdx);
+    list[itemIdx] = calculateTicketTotals({ ...list[itemIdx], city_taxes: current });
+    if (isEdit) setEditLineItems(list);
+    else setLineItems(list);
+  }
+
+  function updateCityTax(itemIdx: number, taxIdx: number, field: "code" | "amount", val: string, isEdit = false) {
+    const list = isEdit ? [...editLineItems] : [...lineItems];
+    const current = [...(list[itemIdx].city_taxes || [])];
+    current[taxIdx] = { ...current[taxIdx], [field]: val };
+    list[itemIdx] = calculateTicketTotals({ ...list[itemIdx], city_taxes: current });
+    if (isEdit) setEditLineItems(list);
+    else setLineItems(list);
+  }
+
   async function createInvoice() {
     if (isCreating) return;
     setIsCreating(true);
@@ -467,6 +580,7 @@ export default function InvoicesPage() {
           adj_date: newAdjDate,
           our_xo: newOurXo,
           client_xo: newClientXo,
+          status: newDocStatus,
           line_items: lineItems,
         }),
       });
@@ -526,6 +640,7 @@ export default function InvoicesPage() {
     setEditAdjDate(data.invoice?.adj_date ? new Date(data.invoice.adj_date).toISOString().split("T")[0] : "");
     setEditOurXo(data.invoice?.our_xo || "E");
     setEditClientXo(data.invoice?.client_xo || "");
+    setEditDocStatus(data.invoice?.status || "Draft");
 
     const items: LineItemInput[] = (data.line_items || []).map((li: Record<string, unknown>) => ({
       service_type: String(li.service_type || "Ticket"),
@@ -539,6 +654,7 @@ export default function InvoicesPage() {
       passport_issue_date: String(li.passport_issue_date || ""),
       ticket_number: String(li.ticket_number || ""),
       conjunction_ticket_no: String(li.conjunction_ticket_no || ""),
+      conjunction_route: String(li.conjunction_route || ""),
       gds_pnr: String(li.gds_pnr || ""),
       gds_name: String(li.gds_name || "Amadeus"),
       airline_name: String(li.airline_name || ""),
@@ -548,7 +664,10 @@ export default function InvoicesPage() {
       doc_type: String(li.doc_type || "BSPD"),
       tour_code: String(li.tour_code || ""),
       issue_date: String(li.issue_date || ""),
+      our_xo: String(li.our_xo || "E"),
       flight_segments: Array.isArray(li.flight_segments) ? (li.flight_segments as FlightSegment[]) : [],
+      airline_city_taxes: Array.isArray(li.airline_city_taxes) ? (li.airline_city_taxes as DynamicTaxItem[]) : [{ code: "XT", amount: "0" }],
+      city_taxes: Array.isArray(li.city_taxes) ? (li.city_taxes as DynamicTaxItem[]) : [{ code: "City Tax", amount: "0" }],
       base_fare: String(li.base_fare || "0"),
       tax_dof: String(li.tax_dof || "0"),
       tax_yq: String(li.tax_yq || "0"),
@@ -572,14 +691,19 @@ export default function InvoicesPage() {
       commission_amount: String(li.commission_amount || "0"),
       discount_percent: String(li.discount_percent || "0"),
       discount_amount: String(li.discount_amount || "0"),
+      psf_percent: String(li.psf_percent || "0"),
       psf_amount: String(li.psf_amount || "0"),
       gst_percent: String(li.gst_percent || "5"),
       gst_amount: String(li.gst_amount || "0"),
+      auto_update: li.auto_update !== undefined ? Boolean(li.auto_update) : true,
+      cancellation_charges_self: String(li.cancellation_charges_self || "0"),
+      cancellation_charges_supplier: String(li.cancellation_charges_supplier || "0"),
       supplier_id: li.supplier_id && typeof li.supplier_id === "object" && "_id" in (li.supplier_id as object) ? String((li.supplier_id as { _id: unknown })._id) : String(li.supplier_id || ""),
       customer_gross: Number(li.customer_gross) || 0,
       customer_net: Number(li.customer_net) || Number(li.amount) || 0,
       supplier_gross: Number(li.supplier_gross) || 0,
       supplier_net: Number(li.supplier_net) || 0,
+      supplier_gross_wo_wht: Number(li.supplier_gross_wo_wht) || 0,
       agency_margin: Number(li.agency_margin) || 0,
     }));
     setEditLineItems(items.length > 0 ? items : [createDefaultTicketItem()]);
@@ -608,6 +732,7 @@ export default function InvoicesPage() {
           adj_date: editAdjDate,
           our_xo: editOurXo,
           client_xo: editClientXo,
+          status: editDocStatus,
           line_items: editLineItems,
         }),
       });
@@ -624,6 +749,7 @@ export default function InvoicesPage() {
 
   const statusStyles: Record<string, string> = {
     Draft: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
+    Confirmed: "bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400",
     Posted: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400",
     Voided: "bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400",
   };
@@ -634,409 +760,716 @@ export default function InvoicesPage() {
     Unpaid: "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400 border border-rose-300 dark:border-rose-800/60",
   };
 
-  // Render Ticket Editor Component (matching ERP screen)
+  // Render Ticket Booking Form (Exact Clone of User's ERP Window)
   const renderTicketForm = (item: LineItemInput, itemIdx: number, isEdit = false) => {
     return (
-      <div className="space-y-3.5 text-[12px] bg-slate-50/50 dark:bg-[#0c0c0e] p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-inner">
-        {/* Row 1: Passenger Details (4 Columns) */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
-          <div className="space-y-1">
-            <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Pax Name *</Label>
-            <Input
-              placeholder="MR JAVED JAHANZEEB"
-              value={item.pax_name || ""}
-              onChange={(e) => updateTicketLineItem(itemIdx, "pax_name", e.target.value, isEdit)}
-              className="h-8 text-[12px] uppercase font-medium bg-white dark:bg-[#161619]"
-            />
+      <div className="space-y-4 text-[12px] bg-slate-50/50 dark:bg-[#0c0c0e] p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-inner">
+        {/* Passenger & Ticket Main Details (Ticked in ERP Screenshot) */}
+        <div className="p-3 bg-white dark:bg-[#111113] rounded-lg border border-slate-200 dark:border-slate-800 space-y-3">
+          <div className="font-bold text-[11px] uppercase tracking-wider text-slate-700 dark:text-slate-300 border-b pb-1 flex justify-between">
+            <span>Passenger &amp; Ticketing Information</span>
+            <span className="font-mono text-primary font-bold">{item.airline_name || "Airline Booking"}</span>
           </div>
-          <div className="space-y-1">
-            <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Pax Type *</Label>
-            <Select value={item.pax_type || "A"} onValueChange={(v) => updateTicketLineItem(itemIdx, "pax_type", v || "A", isEdit)}>
-              <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
-                <SelectValue>
-                  {(val) => val === "A" ? "Adult (A)" : val === "C" ? "Child (C)" : val === "I" ? "Infant (I)" : val || "Adult (A)"}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="A">Adult (A)</SelectItem>
-                <SelectItem value="C">Child (C)</SelectItem>
-                <SelectItem value="I">Infant (I)</SelectItem>
-              </SelectContent>
-            </Select>
+
+          {/* Row 1: Pax, Pax Type, PP No, PP Issue Dt */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="space-y-1">
+              <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Pax *</Label>
+              <Input
+                placeholder="MR JAVED JAHANZEEB"
+                value={item.pax_name || ""}
+                onChange={(e) => updateTicketLineItem(itemIdx, "pax_name", e.target.value.toUpperCase(), isEdit)}
+                className="h-8 text-[12px] uppercase font-semibold bg-white dark:bg-[#161619]"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Pax Type *</Label>
+              <Select value={item.pax_type || "A"} onValueChange={(v) => updateTicketLineItem(itemIdx, "pax_type", v || "A", isEdit)}>
+                <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
+                  <SelectValue>
+                    {(val) => val === "A" ? "Adult (A)" : val === "C" ? "Child (C)" : val === "I" ? "Infant (I)" : val || "Adult (A)"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="A">Adult (A)</SelectItem>
+                  <SelectItem value="C">Child (C)</SelectItem>
+                  <SelectItem value="I">Infant (I)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">PP No.</Label>
+              <Input
+                placeholder="e.g. AB1234567"
+                value={item.passport_no || ""}
+                onChange={(e) => updateTicketLineItem(itemIdx, "passport_no", e.target.value.toUpperCase(), isEdit)}
+                className="h-8 text-[12px] uppercase bg-white dark:bg-[#161619]"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">PP Issue Dt</Label>
+              <Input
+                type="date"
+                value={item.passport_issue_date || ""}
+                onChange={(e) => updateTicketLineItem(itemIdx, "passport_issue_date", e.target.value, isEdit)}
+                className="h-8 text-[12px] bg-white dark:bg-[#161619]"
+              />
+            </div>
           </div>
-          <div className="space-y-1">
-            <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Passport No</Label>
-            <Input
-              placeholder="e.g. AB1234567"
-              value={item.passport_no || ""}
-              onChange={(e) => updateTicketLineItem(itemIdx, "passport_no", e.target.value, isEdit)}
-              className="h-8 text-[12px] uppercase bg-white dark:bg-[#161619]"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">PP Issue Date</Label>
-            <Input
-              type="date"
-              value={item.passport_issue_date || ""}
-              onChange={(e) => updateTicketLineItem(itemIdx, "passport_issue_date", e.target.value, isEdit)}
-              className="h-8 text-[12px] bg-white dark:bg-[#161619]"
-            />
+
+          {/* Row 2: Ticket No, PNR, GDS, Airline, Sector, Doc, Type, Our XO */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-7 gap-2.5">
+            <div className="space-y-1">
+              <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Ticket No. *</Label>
+              <Input
+                placeholder="157-2127-850-017"
+                value={item.ticket_number || ""}
+                onChange={(e) => updateTicketLineItem(itemIdx, "ticket_number", e.target.value, isEdit)}
+                className="h-8 text-[12px] font-mono font-bold bg-white dark:bg-[#161619]"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">PNR</Label>
+              <Input
+                placeholder="PNR123"
+                value={item.gds_pnr || ""}
+                onChange={(e) => updateTicketLineItem(itemIdx, "gds_pnr", e.target.value.toUpperCase(), isEdit)}
+                className="h-8 text-[12px] font-mono uppercase font-bold text-blue-600 bg-white dark:bg-[#161619]"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">GDS</Label>
+              <Select value={item.gds_name || "Amadeus"} onValueChange={(v) => updateTicketLineItem(itemIdx, "gds_name", v || "Amadeus", isEdit)}>
+                <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
+                  <SelectValue>{(val) => val || "Amadeus"}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Amadeus">Amadeus</SelectItem>
+                  <SelectItem value="Sabre">Sabre</SelectItem>
+                  <SelectItem value="Galileo">Galileo</SelectItem>
+                  <SelectItem value="Worldspan">Worldspan</SelectItem>
+                  <SelectItem value="Direct">Direct Portal</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Airline *</Label>
+              <Input
+                placeholder="QATAR / 157"
+                value={item.airline_name || ""}
+                onChange={(e) => updateTicketLineItem(itemIdx, "airline_name", e.target.value.toUpperCase(), isEdit)}
+                className="h-8 text-[12px] uppercase bg-white dark:bg-[#161619]"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Sector *</Label>
+              <Input
+                placeholder="FOU / LHE-DOH"
+                value={item.sector || ""}
+                onChange={(e) => updateTicketLineItem(itemIdx, "sector", e.target.value.toUpperCase(), isEdit)}
+                className="h-8 text-[12px] uppercase font-mono bg-white dark:bg-[#161619]"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Doc *</Label>
+              <Select value={item.doc_type || "BSPD"} onValueChange={(v) => updateTicketLineItem(itemIdx, "doc_type", v || "BSPD", isEdit)}>
+                <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
+                  <SelectValue>{(val) => val || "BSPD"}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="BSPD">BSPD</SelectItem>
+                  <SelectItem value="E-Ticket">E-Ticket</SelectItem>
+                  <SelectItem value="MCO">MCO</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Type *</Label>
+              <Select value={item.trip_type || "International"} onValueChange={(v) => updateTicketLineItem(itemIdx, "trip_type", v || "International", isEdit)}>
+                <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
+                  <SelectValue>{(val) => val === "International" ? "I (Int)" : "D (Dom)"}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="International">International (I)</SelectItem>
+                  <SelectItem value="Domestic">Domestic (D)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
 
-        {/* Row 2: Airline, Ticket No, PNR, GDS, Sector (6 Columns) */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5">
-          <div className="space-y-1">
-            <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Ticket No *</Label>
-            <Input
-              placeholder="157-2127-850-017"
-              value={item.ticket_number || ""}
-              onChange={(e) => updateTicketLineItem(itemIdx, "ticket_number", e.target.value, isEdit)}
-              className="h-8 text-[12px] font-mono bg-white dark:bg-[#161619]"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">GDS PNR</Label>
-            <Input
-              placeholder="PNR123"
-              value={item.gds_pnr || ""}
-              onChange={(e) => updateTicketLineItem(itemIdx, "gds_pnr", e.target.value.toUpperCase(), isEdit)}
-              className="h-8 text-[12px] font-mono uppercase font-bold text-blue-600 bg-white dark:bg-[#161619]"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Airline</Label>
-            <Input
-              placeholder="QATAR / 157"
-              value={item.airline_name || ""}
-              onChange={(e) => updateTicketLineItem(itemIdx, "airline_name", e.target.value.toUpperCase(), isEdit)}
-              className="h-8 text-[12px] uppercase bg-white dark:bg-[#161619]"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Sector</Label>
-            <Input
-              placeholder="LHE-DOH-BCN"
-              value={item.sector || ""}
-              onChange={(e) => updateTicketLineItem(itemIdx, "sector", e.target.value.toUpperCase(), isEdit)}
-              className="h-8 text-[12px] uppercase font-mono bg-white dark:bg-[#161619]"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">GDS System</Label>
-            <Select value={item.gds_name || "Amadeus"} onValueChange={(v) => updateTicketLineItem(itemIdx, "gds_name", v || "Amadeus", isEdit)}>
-              <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
-                <SelectValue>{(val) => val || "Amadeus"}</SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Amadeus">Amadeus</SelectItem>
-                <SelectItem value="Sabre">Sabre</SelectItem>
-                <SelectItem value="Galileo">Galileo</SelectItem>
-                <SelectItem value="Worldspan">Worldspan</SelectItem>
-                <SelectItem value="Direct">Direct Portal</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Trip Type</Label>
-            <Select value={item.trip_type || "International"} onValueChange={(v) => updateTicketLineItem(itemIdx, "trip_type", v || "International", isEdit)}>
-              <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
-                <SelectValue>{(val) => val || "International"}</SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="International">International</SelectItem>
-                <SelectItem value="Domestic">Domestic</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+        {/* 2-Column Split: Left Green Box vs Right Green Box */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          
+          {/* LEFT GREEN BOX (Routing & Segments Table + Conjunction Ticket) */}
+          <div className="lg:col-span-6 space-y-3.5 flex flex-col justify-between">
+            {/* Flight Segments Table */}
+            <div className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden bg-white dark:bg-[#111113]">
+              <div className="bg-slate-100 dark:bg-slate-900 px-3 py-1.5 flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
+                <span className="font-bold text-[11px] text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                  <Plane className="h-3.5 w-3.5 text-blue-600" /> Flight Routing &amp; Segments
+                </span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-6 text-[10px] px-2 gap-1 bg-white dark:bg-slate-800"
+                  onClick={() => addFlightSegment(itemIdx, isEdit)}
+                >
+                  <Plus className="h-2.5 w-2.5" /> Add Leg
+                </Button>
+              </div>
+              <div className="w-full">
+                <table className="w-full text-[11px] table-auto">
+                  <thead className="bg-slate-50 dark:bg-[#161618] border-b border-slate-200 dark:border-slate-800 text-slate-500 font-semibold">
+                    <tr>
+                      <th className="p-1.5 text-left w-20">City</th>
+                      <th className="p-1.5 text-left w-16">Fl.No</th>
+                      <th className="p-1.5 text-left w-12">Cl</th>
+                      <th className="p-1.5 text-left w-28">Dep. Date</th>
+                      <th className="p-1.5 text-left w-20">Dep. Time</th>
+                      <th className="p-1.5 text-left w-20">Arr. Time</th>
+                      <th className="p-1.5 text-left">Fare Basis</th>
+                      <th className="p-1.5 text-center w-6"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(item.flight_segments || []).map((seg, segIdx) => (
+                      <tr key={segIdx} className="border-b border-slate-100 dark:border-slate-800/60">
+                        <td className="p-1">
+                          <Input
+                            placeholder="LHE"
+                            value={seg.city}
+                            onChange={(e) => updateFlightSegment(itemIdx, segIdx, "city", e.target.value.toUpperCase(), isEdit)}
+                            className="h-7 text-[11px] uppercase font-mono w-full bg-transparent"
+                          />
+                        </td>
+                        <td className="p-1">
+                          <Input
+                            placeholder="621"
+                            value={seg.flight_no}
+                            onChange={(e) => updateFlightSegment(itemIdx, segIdx, "flight_no", e.target.value, isEdit)}
+                            className="h-7 text-[11px] w-full bg-transparent"
+                          />
+                        </td>
+                        <td className="p-1">
+                          <Input
+                            placeholder="Y"
+                            value={seg.booking_class}
+                            onChange={(e) => updateFlightSegment(itemIdx, segIdx, "booking_class", e.target.value.toUpperCase(), isEdit)}
+                            className="h-7 text-[11px] uppercase font-mono w-full text-center bg-transparent"
+                          />
+                        </td>
+                        <td className="p-1">
+                          <Input
+                            type="date"
+                            value={seg.dep_date}
+                            onChange={(e) => updateFlightSegment(itemIdx, segIdx, "dep_date", e.target.value, isEdit)}
+                            className="h-7 text-[11px] w-full bg-transparent"
+                          />
+                        </td>
+                        <td className="p-1">
+                          <Input
+                            placeholder="14:30"
+                            value={seg.dep_time}
+                            onChange={(e) => updateFlightSegment(itemIdx, segIdx, "dep_time", e.target.value, isEdit)}
+                            className="h-7 text-[11px] font-mono w-full bg-transparent"
+                          />
+                        </td>
+                        <td className="p-1">
+                          <Input
+                            placeholder="18:45"
+                            value={seg.arr_time}
+                            onChange={(e) => updateFlightSegment(itemIdx, segIdx, "arr_time", e.target.value, isEdit)}
+                            className="h-7 text-[11px] font-mono w-full bg-transparent"
+                          />
+                        </td>
+                        <td className="p-1">
+                          <Input
+                            placeholder="KLE01PK"
+                            value={seg.fare_basis}
+                            onChange={(e) => updateFlightSegment(itemIdx, segIdx, "fare_basis", e.target.value.toUpperCase(), isEdit)}
+                            className="h-7 text-[11px] font-mono uppercase w-full bg-transparent"
+                          />
+                        </td>
+                        <td className="p-1 text-center">
+                          {(item.flight_segments || []).length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeFlightSegment(itemIdx, segIdx, isEdit)}
+                              className="text-slate-400 hover:text-red-500"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
 
-        {/* Flight Segments (Multi-Leg Table) - Fluid Full Width */}
-        <div className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden bg-white dark:bg-[#111113]">
-          <div className="bg-slate-100 dark:bg-slate-900 px-3 py-1.5 flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
-            <span className="font-bold text-[11px] text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-              <Plane className="h-3.5 w-3.5 text-blue-600" /> Flight Routing &amp; Segments
-            </span>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="h-6 text-[10px] px-2 gap-1"
-              onClick={() => addFlightSegment(itemIdx, isEdit)}
-            >
-              <Plus className="h-2.5 w-2.5" /> Add Leg
-            </Button>
+            {/* Conjunction Ticket Box (Directly below Flight Segments in ERP) */}
+            <div className="p-3 bg-white dark:bg-[#111113] rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
+              <div className="font-bold text-[11px] text-blue-600 dark:text-blue-400 border-b pb-1 flex justify-between">
+                <span>Conjunction Ticket</span>
+                <span className="text-[10px] text-slate-400 font-normal">Secondary ticket for extended sectors</span>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-slate-500 font-semibold">Ticket No.</Label>
+                  <Input
+                    placeholder="157-2127-850-018"
+                    value={item.conjunction_ticket_no || ""}
+                    onChange={(e) => updateTicketLineItem(itemIdx, "conjunction_ticket_no", e.target.value, isEdit)}
+                    className="h-7 text-[11px] font-mono bg-white dark:bg-[#161619]"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-slate-500 font-semibold">Route Details</Label>
+                  <Input
+                    placeholder="LHE"
+                    value={item.conjunction_route || ""}
+                    onChange={(e) => updateTicketLineItem(itemIdx, "conjunction_route", e.target.value.toUpperCase(), isEdit)}
+                    className="h-7 text-[11px] font-mono uppercase bg-white dark:bg-[#161619]"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="w-full">
-            <table className="w-full text-[11px] table-auto">
-              <thead className="bg-slate-50 dark:bg-[#161618] border-b border-slate-200 dark:border-slate-800 text-slate-500 font-semibold">
-                <tr>
-                  <th className="p-1.5 text-left w-24">City</th>
-                  <th className="p-1.5 text-left w-24">Fl. No</th>
-                  <th className="p-1.5 text-left w-16">Cl</th>
-                  <th className="p-1.5 text-left w-36">Dep Date</th>
-                  <th className="p-1.5 text-left w-28">Dep Time</th>
-                  <th className="p-1.5 text-left w-28">Arr Time</th>
-                  <th className="p-1.5 text-left">Fare Basis</th>
-                  <th className="p-1.5 text-center w-8"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {(item.flight_segments || []).map((seg, segIdx) => (
-                  <tr key={segIdx} className="border-b border-slate-100 dark:border-slate-800/60">
-                    <td className="p-1">
+
+          {/* RIGHT GREEN BOX (Airline City Tax, IATA Taxes, Commercials, Cancellation, Totals) */}
+          <div className="lg:col-span-6 space-y-3">
+            
+            {/* Top: Airline City Tax & City Tax Side-by-Side */}
+            <div className="grid grid-cols-2 gap-3">
+              {/* Airline City Tax Table */}
+              <div className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden bg-white dark:bg-[#111113]">
+                <div className="bg-slate-100 dark:bg-slate-900 px-2 py-1 flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
+                  <span className="font-bold text-[10px] text-slate-700 dark:text-slate-300">Airline City Tax</span>
+                  <button
+                    type="button"
+                    onClick={() => addAirlineCityTax(itemIdx, isEdit)}
+                    className="text-primary hover:text-primary/80 text-[10px] font-bold flex items-center gap-0.5"
+                  >
+                    <Plus className="h-3 w-3" />
+                  </button>
+                </div>
+                <div className="p-1 space-y-1 max-h-24 overflow-y-auto">
+                  {(item.airline_city_taxes || []).map((t, tIdx) => (
+                    <div key={tIdx} className="flex gap-1 items-center">
                       <Input
-                        placeholder="LHE"
-                        value={seg.city}
-                        onChange={(e) => updateFlightSegment(itemIdx, segIdx, "city", e.target.value.toUpperCase(), isEdit)}
-                        className="h-7 text-[11px] uppercase font-mono w-full bg-transparent"
+                        placeholder="XT"
+                        value={t.code}
+                        onChange={(e) => updateAirlineCityTax(itemIdx, tIdx, "code", e.target.value.toUpperCase(), isEdit)}
+                        className="h-6 text-[10px] font-mono uppercase w-16"
                       />
-                    </td>
-                    <td className="p-1">
                       <Input
-                        placeholder="621"
-                        value={seg.flight_no}
-                        onChange={(e) => updateFlightSegment(itemIdx, segIdx, "flight_no", e.target.value, isEdit)}
-                        className="h-7 text-[11px] w-full bg-transparent"
+                        type="number"
+                        placeholder="0.00"
+                        value={t.amount}
+                        onChange={(e) => updateAirlineCityTax(itemIdx, tIdx, "amount", e.target.value, isEdit)}
+                        className="h-6 text-[10px] font-mono flex-1 text-right"
                       />
-                    </td>
-                    <td className="p-1">
-                      <Input
-                        placeholder="Y"
-                        value={seg.booking_class}
-                        onChange={(e) => updateFlightSegment(itemIdx, segIdx, "booking_class", e.target.value.toUpperCase(), isEdit)}
-                        className="h-7 text-[11px] uppercase font-mono w-full text-center bg-transparent"
-                      />
-                    </td>
-                    <td className="p-1">
-                      <Input
-                        type="date"
-                        value={seg.dep_date}
-                        onChange={(e) => updateFlightSegment(itemIdx, segIdx, "dep_date", e.target.value, isEdit)}
-                        className="h-7 text-[11px] w-full bg-transparent"
-                      />
-                    </td>
-                    <td className="p-1">
-                      <Input
-                        placeholder="14:30"
-                        value={seg.dep_time}
-                        onChange={(e) => updateFlightSegment(itemIdx, segIdx, "dep_time", e.target.value, isEdit)}
-                        className="h-7 text-[11px] font-mono w-full bg-transparent"
-                      />
-                    </td>
-                    <td className="p-1">
-                      <Input
-                        placeholder="18:45"
-                        value={seg.arr_time}
-                        onChange={(e) => updateFlightSegment(itemIdx, segIdx, "arr_time", e.target.value, isEdit)}
-                        className="h-7 text-[11px] font-mono w-full bg-transparent"
-                      />
-                    </td>
-                    <td className="p-1">
-                      <Input
-                        placeholder="KLE01PK"
-                        value={seg.fare_basis}
-                        onChange={(e) => updateFlightSegment(itemIdx, segIdx, "fare_basis", e.target.value.toUpperCase(), isEdit)}
-                        className="h-7 text-[11px] font-mono uppercase w-full bg-transparent"
-                      />
-                    </td>
-                    <td className="p-1 text-center">
-                      {(item.flight_segments || []).length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeFlightSegment(itemIdx, segIdx, isEdit)}
-                          className="text-slate-400 hover:text-red-500"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
+                      {(item.airline_city_taxes || []).length > 1 && (
+                        <button type="button" onClick={() => removeAirlineCityTax(itemIdx, tIdx, isEdit)} className="text-slate-400 hover:text-red-500">
+                          <Trash2 className="h-2.5 w-2.5" />
                         </button>
                       )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
-        {/* Airfare, IATA Taxes & Deductions Matrix */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
-          {/* Left: Taxes Breakdown Box */}
-          <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111113] space-y-2">
-            <div className="font-bold text-[11px] text-slate-800 dark:text-slate-200 border-b pb-1 flex justify-between">
-              <span>Airfare &amp; IATA Airline Taxes</span>
-              <span className="font-mono text-blue-600">Base + Taxes</span>
-            </div>
-            <div className="grid grid-cols-4 gap-2 text-[11px]">
-              <div className="col-span-2">
-                <span className="text-[10px] text-slate-500 font-semibold block">Base Fare *</span>
-                <Input
-                  type="number"
-                  placeholder="37024"
-                  value={item.base_fare || ""}
-                  onChange={(e) => updateTicketLineItem(itemIdx, "base_fare", e.target.value, isEdit)}
-                  className="h-7 text-[11px] font-mono font-bold"
-                />
-              </div>
-              <div>
-                <span className="text-[10px] text-slate-500 font-semibold block">DOF (Surcharge)</span>
-                <Input
-                  type="number"
-                  placeholder="976"
-                  value={item.tax_dof || ""}
-                  onChange={(e) => updateTicketLineItem(itemIdx, "tax_dof", e.target.value, isEdit)}
-                  className="h-7 text-[11px] font-mono"
-                />
-              </div>
-              <div>
-                <span className="text-[10px] text-slate-500 font-semibold block">YQ / YR (Fuel)</span>
-                <Input
-                  type="number"
-                  placeholder="0"
-                  value={item.tax_yq || ""}
-                  onChange={(e) => updateTicketLineItem(itemIdx, "tax_yq", e.target.value, isEdit)}
-                  className="h-7 text-[11px] font-mono"
-                />
-              </div>
-              <div>
-                <span className="text-[10px] text-slate-500 font-semibold block">RG (FED Tax)</span>
-                <Input
-                  type="number"
-                  placeholder="0"
-                  value={item.tax_rg || ""}
-                  onChange={(e) => updateTicketLineItem(itemIdx, "tax_rg", e.target.value, isEdit)}
-                  className="h-7 text-[11px] font-mono"
-                />
-              </div>
-              <div>
-                <span className="text-[10px] text-slate-500 font-semibold block">PK (CAA Fee)</span>
-                <Input
-                  type="number"
-                  placeholder="0"
-                  value={item.tax_pk || ""}
-                  onChange={(e) => updateTicketLineItem(itemIdx, "tax_pk", e.target.value, isEdit)}
-                  className="h-7 text-[11px] font-mono"
-                />
-              </div>
-              <div>
-                <span className="text-[10px] text-slate-500 font-semibold block">RN</span>
-                <Input
-                  type="number"
-                  placeholder="0"
-                  value={item.tax_rn || ""}
-                  onChange={(e) => updateTicketLineItem(itemIdx, "tax_rn", e.target.value, isEdit)}
-                  className="h-7 text-[11px] font-mono"
-                />
-              </div>
-              <div>
-                <span className="text-[10px] text-slate-500 font-semibold block">Other / XT</span>
-                <Input
-                  type="number"
-                  placeholder="0"
-                  value={item.tax_airline_city || ""}
-                  onChange={(e) => updateTicketLineItem(itemIdx, "tax_airline_city", e.target.value, isEdit)}
-                  className="h-7 text-[11px] font-mono"
-                />
+              {/* City Tax Table */}
+              <div className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden bg-white dark:bg-[#111113]">
+                <div className="bg-slate-100 dark:bg-slate-900 px-2 py-1 flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
+                  <span className="font-bold text-[10px] text-slate-700 dark:text-slate-300">City Tax</span>
+                  <button
+                    type="button"
+                    onClick={() => addCityTax(itemIdx, isEdit)}
+                    className="text-primary hover:text-primary/80 text-[10px] font-bold flex items-center gap-0.5"
+                  >
+                    <Plus className="h-3 w-3" />
+                  </button>
+                </div>
+                <div className="p-1 space-y-1 max-h-24 overflow-y-auto">
+                  {(item.city_taxes || []).map((t, tIdx) => (
+                    <div key={tIdx} className="flex gap-1 items-center">
+                      <Input
+                        placeholder="City Tax"
+                        value={t.code}
+                        onChange={(e) => updateCityTax(itemIdx, tIdx, "code", e.target.value, isEdit)}
+                        className="h-6 text-[10px] font-mono flex-1"
+                      />
+                      <Input
+                        type="number"
+                        placeholder="0.00"
+                        value={t.amount}
+                        onChange={(e) => updateCityTax(itemIdx, tIdx, "amount", e.target.value, isEdit)}
+                        className="h-6 text-[10px] font-mono w-20 text-right"
+                      />
+                      {(item.city_taxes || []).length > 1 && (
+                        <button type="button" onClick={() => removeCityTax(itemIdx, tIdx, isEdit)} className="text-slate-400 hover:text-red-500">
+                          <Trash2 className="h-2.5 w-2.5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Right: Commercials, Commission, WHT & Discounts */}
-          <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111113] space-y-2">
-            <div className="font-bold text-[11px] text-slate-800 dark:text-slate-200 border-b pb-1 flex justify-between">
-              <span>Commercials, WHT &amp; Profit Markup</span>
-              <span className="font-mono text-emerald-600">Deductions</span>
+            {/* Middle: 14 IATA Standard Airline Taxes 4x4 Grid */}
+            <div className="p-2.5 bg-white dark:bg-[#111113] rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
+              <div className="grid grid-cols-4 gap-1.5 text-[10px]">
+                {/* Row 1: Fare & RN */}
+                <div className="col-span-2">
+                  <span className="text-[9px] text-slate-500 font-bold block uppercase">Fare (Base Fare) *</span>
+                  <Input
+                    type="number"
+                    value={item.base_fare || ""}
+                    onChange={(e) => updateTicketLineItem(itemIdx, "base_fare", e.target.value, isEdit)}
+                    className="h-6 text-[11px] font-mono font-bold text-primary"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <span className="text-[9px] text-slate-500 font-semibold block">RN</span>
+                  <Input
+                    type="number"
+                    value={item.tax_rn || ""}
+                    onChange={(e) => updateTicketLineItem(itemIdx, "tax_rn", e.target.value, isEdit)}
+                    className="h-6 text-[10px] font-mono"
+                  />
+                </div>
+
+                {/* Row 2: DOF, APT, RG, PK */}
+                <div>
+                  <span className="text-[9px] text-slate-500 font-semibold block">DOF</span>
+                  <Input
+                    type="number"
+                    value={item.tax_dof || ""}
+                    onChange={(e) => updateTicketLineItem(itemIdx, "tax_dof", e.target.value, isEdit)}
+                    className="h-6 text-[10px] font-mono"
+                  />
+                </div>
+                <div>
+                  <span className="text-[9px] text-slate-500 font-semibold block">APT</span>
+                  <Input
+                    type="number"
+                    value={item.tax_apt || ""}
+                    onChange={(e) => updateTicketLineItem(itemIdx, "tax_apt", e.target.value, isEdit)}
+                    className="h-6 text-[10px] font-mono"
+                  />
+                </div>
+                <div>
+                  <span className="text-[9px] text-slate-500 font-semibold block">RG</span>
+                  <Input
+                    type="number"
+                    value={item.tax_rg || ""}
+                    onChange={(e) => updateTicketLineItem(itemIdx, "tax_rg", e.target.value, isEdit)}
+                    className="h-6 text-[10px] font-mono"
+                  />
+                </div>
+                <div>
+                  <span className="text-[9px] text-slate-500 font-semibold block">PK</span>
+                  <Input
+                    type="number"
+                    value={item.tax_pk || ""}
+                    onChange={(e) => updateTicketLineItem(itemIdx, "tax_pk", e.target.value, isEdit)}
+                    className="h-6 text-[10px] font-mono"
+                  />
+                </div>
+
+                {/* Row 3: YR, KBR, KBP, PB */}
+                <div>
+                  <span className="text-[9px] text-slate-500 font-semibold block">YR</span>
+                  <Input
+                    type="number"
+                    value={item.tax_yr || ""}
+                    onChange={(e) => updateTicketLineItem(itemIdx, "tax_yr", e.target.value, isEdit)}
+                    className="h-6 text-[10px] font-mono"
+                  />
+                </div>
+                <div>
+                  <span className="text-[9px] text-slate-500 font-semibold block">KBR</span>
+                  <Input
+                    type="number"
+                    value={item.tax_kbr || ""}
+                    onChange={(e) => updateTicketLineItem(itemIdx, "tax_kbr", e.target.value, isEdit)}
+                    className="h-6 text-[10px] font-mono"
+                  />
+                </div>
+                <div>
+                  <span className="text-[9px] text-slate-500 font-semibold block">KBP</span>
+                  <Input
+                    type="number"
+                    value={item.tax_kbp || ""}
+                    onChange={(e) => updateTicketLineItem(itemIdx, "tax_kbp", e.target.value, isEdit)}
+                    className="h-6 text-[10px] font-mono"
+                  />
+                </div>
+                <div>
+                  <span className="text-[9px] text-slate-500 font-semibold block">PB</span>
+                  <Input
+                    type="number"
+                    value={item.tax_pb || ""}
+                    onChange={(e) => updateTicketLineItem(itemIdx, "tax_pb", e.target.value, isEdit)}
+                    className="h-6 text-[10px] font-mono"
+                  />
+                </div>
+
+                {/* Row 4: YQ, XZ, YD, YI */}
+                <div>
+                  <span className="text-[9px] text-slate-500 font-semibold block">YQ</span>
+                  <Input
+                    type="number"
+                    value={item.tax_yq || ""}
+                    onChange={(e) => updateTicketLineItem(itemIdx, "tax_yq", e.target.value, isEdit)}
+                    className="h-6 text-[10px] font-mono"
+                  />
+                </div>
+                <div>
+                  <span className="text-[9px] text-slate-500 font-semibold block">XZ</span>
+                  <Input
+                    type="number"
+                    value={item.tax_xz || ""}
+                    onChange={(e) => updateTicketLineItem(itemIdx, "tax_xz", e.target.value, isEdit)}
+                    className="h-6 text-[10px] font-mono"
+                  />
+                </div>
+                <div>
+                  <span className="text-[9px] text-slate-500 font-semibold block">YD</span>
+                  <Input
+                    type="number"
+                    value={item.tax_yd || ""}
+                    onChange={(e) => updateTicketLineItem(itemIdx, "tax_yd", e.target.value, isEdit)}
+                    className="h-6 text-[10px] font-mono"
+                  />
+                </div>
+                <div>
+                  <span className="text-[9px] text-slate-500 font-semibold block">YI</span>
+                  <Input
+                    type="number"
+                    value={item.tax_yi || ""}
+                    onChange={(e) => updateTicketLineItem(itemIdx, "tax_yi", e.target.value, isEdit)}
+                    className="h-6 text-[10px] font-mono"
+                  />
+                </div>
+              </div>
             </div>
-            <div className="grid grid-cols-3 gap-2 text-[11px]">
-              <div>
-                <span className="text-[10px] text-slate-500 font-semibold block">WHT (%)</span>
-                <Input
-                  type="number"
-                  placeholder="12"
-                  value={item.wht_percent || ""}
-                  onChange={(e) => updateTicketLineItem(itemIdx, "wht_percent", e.target.value, isEdit)}
-                  className="h-7 text-[11px] font-mono"
-                />
+
+            {/* Commercials, WHT & Deductions Matrix */}
+            <div className="p-2.5 bg-white dark:bg-[#111113] rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[10px]">
+                {/* WHT & DIS */}
+                <div className="flex items-center justify-between gap-1">
+                  <span className="w-12 font-bold text-slate-600 dark:text-slate-400">WHT</span>
+                  <Input
+                    type="number"
+                    placeholder="%"
+                    value={item.wht_percent || ""}
+                    onChange={(e) => updateTicketLineItem(itemIdx, "wht_percent", e.target.value, isEdit)}
+                    className="h-6 w-14 text-[10px] font-mono"
+                  />
+                  <Input
+                    readOnly
+                    value={item.wht_amount || "0.00"}
+                    className="h-6 flex-1 text-[10px] font-mono bg-slate-50 dark:bg-slate-900 text-right"
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-1">
+                  <span className="w-12 font-bold text-slate-600 dark:text-slate-400">DIS</span>
+                  <Input
+                    type="number"
+                    placeholder="%"
+                    value={item.discount_percent || ""}
+                    onChange={(e) => updateTicketLineItem(itemIdx, "discount_percent", e.target.value, isEdit)}
+                    className="h-6 w-14 text-[10px] font-mono"
+                  />
+                  <Input
+                    readOnly
+                    value={item.discount_amount || "0.00"}
+                    className="h-6 flex-1 text-[10px] font-mono bg-slate-50 dark:bg-slate-900 text-right"
+                  />
+                </div>
+
+                {/* COM & PSF/P */}
+                <div className="flex items-center justify-between gap-1">
+                  <span className="w-12 font-bold text-slate-600 dark:text-slate-400">COM</span>
+                  <Input
+                    type="number"
+                    placeholder="%"
+                    value={item.commission_percent || ""}
+                    onChange={(e) => updateTicketLineItem(itemIdx, "commission_percent", e.target.value, isEdit)}
+                    className="h-6 w-14 text-[10px] font-mono"
+                  />
+                  <Input
+                    readOnly
+                    value={item.commission_amount || "0.00"}
+                    className="h-6 flex-1 text-[10px] font-mono bg-slate-50 dark:bg-slate-900 text-right"
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-1">
+                  <span className="w-12 font-bold text-slate-600 dark:text-slate-400">PSF/P</span>
+                  <Input
+                    type="number"
+                    placeholder="%"
+                    value={item.psf_percent || ""}
+                    onChange={(e) => updateTicketLineItem(itemIdx, "psf_percent", e.target.value, isEdit)}
+                    className="h-6 w-14 text-[10px] font-mono"
+                  />
+                  <Input
+                    type="number"
+                    placeholder="Amount"
+                    value={item.psf_amount || ""}
+                    onChange={(e) => updateTicketLineItem(itemIdx, "psf_amount", e.target.value, isEdit)}
+                    className="h-6 flex-1 text-[10px] font-mono text-right"
+                  />
+                </div>
+
+                {/* PSF flat & GST */}
+                <div className="flex items-center justify-between gap-1">
+                  <span className="w-12 font-bold text-slate-600 dark:text-slate-400">PSF</span>
+                  <Input
+                    type="number"
+                    placeholder="Flat Fee"
+                    value={item.psf_amount || ""}
+                    onChange={(e) => updateTicketLineItem(itemIdx, "psf_amount", e.target.value, isEdit)}
+                    className="h-6 flex-1 text-[10px] font-mono text-right"
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-1">
+                  <span className="w-12 font-bold text-slate-600 dark:text-slate-400">GST</span>
+                  <Input
+                    type="number"
+                    placeholder="%"
+                    value={item.gst_percent || ""}
+                    onChange={(e) => updateTicketLineItem(itemIdx, "gst_percent", e.target.value, isEdit)}
+                    className="h-6 w-14 text-[10px] font-mono"
+                  />
+                  <Input
+                    readOnly
+                    value={item.gst_amount || "0.00"}
+                    className="h-6 flex-1 text-[10px] font-mono bg-slate-50 dark:bg-slate-900 text-right"
+                  />
+                </div>
               </div>
-              <div>
-                <span className="text-[10px] text-slate-500 font-semibold block">Commission (%)</span>
-                <Input
-                  type="number"
-                  placeholder="0"
-                  value={item.commission_percent || ""}
-                  onChange={(e) => updateTicketLineItem(itemIdx, "commission_percent", e.target.value, isEdit)}
-                  className="h-7 text-[11px] font-mono"
-                />
-              </div>
-              <div>
-                <span className="text-[10px] text-slate-500 font-semibold block">Discount (%)</span>
-                <Input
-                  type="number"
-                  placeholder="0"
-                  value={item.discount_percent || ""}
-                  onChange={(e) => updateTicketLineItem(itemIdx, "discount_percent", e.target.value, isEdit)}
-                  className="h-7 text-[11px] font-mono"
-                />
-              </div>
-              <div>
-                <span className="text-[10px] text-slate-500 font-semibold block">PSF / Service Fee</span>
-                <Input
-                  type="number"
-                  placeholder="0"
-                  value={item.psf_amount || ""}
-                  onChange={(e) => updateTicketLineItem(itemIdx, "psf_amount", e.target.value, isEdit)}
-                  className="h-7 text-[11px] font-mono font-semibold text-emerald-600"
-                />
-              </div>
-              <div>
-                <span className="text-[10px] text-slate-500 font-semibold block">GST (%)</span>
-                <Input
-                  type="number"
-                  placeholder="5"
-                  value={item.gst_percent || ""}
-                  onChange={(e) => updateTicketLineItem(itemIdx, "gst_percent", e.target.value, isEdit)}
-                  className="h-7 text-[11px] font-mono"
-                />
-              </div>
-              <div className="flex items-end">
+
+              {/* Auto Update Checkbox & Auto-Calc Trigger */}
+              <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800 text-[10px]">
+                <label className="flex items-center gap-1.5 cursor-pointer text-slate-600 dark:text-slate-400">
+                  <input
+                    type="checkbox"
+                    checked={item.auto_update !== false}
+                    onChange={(e) => updateTicketLineItem(itemIdx, "auto_update", e.target.checked, isEdit)}
+                    className="rounded border-gray-300 text-primary focus:ring-primary h-3 w-3"
+                  />
+                  <span>Auto Update</span>
+                </label>
                 <Button
                   type="button"
                   variant="secondary"
                   size="sm"
-                  className="h-7 text-[10px] w-full gap-1"
+                  className="h-6 text-[10px] px-2 gap-1"
                   onClick={() => updateTicketLineItem(itemIdx, "base_fare", item.base_fare, isEdit)}
                 >
-                  <Calculator className="h-3 w-3" /> Auto-Calc
+                  <Calculator className="h-3 w-3" /> Recalculate
                 </Button>
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* Real-Time Accounting Totals Strip (matching ERP bottom right) */}
-        <div className="p-2.5 rounded-lg bg-slate-900 text-white flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-6 font-mono text-[12px]">
-            <div>
-              <span className="text-slate-400 text-[10px] block uppercase font-bold tracking-wider">Customer Gross</span>
-              <span className="font-bold">{item.customer_gross?.toLocaleString() || "0.00"}</span>
+            {/* Cancellation Charges */}
+            <div className="p-2 bg-white dark:bg-[#111113] rounded-lg border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 text-[10px]">
+              <span className="font-bold text-slate-600 dark:text-slate-400">Cancellation Charges</span>
+              <div className="flex items-center gap-1">
+                <span className="text-slate-400">Self:</span>
+                <Input
+                  type="number"
+                  placeholder="0.00"
+                  value={item.cancellation_charges_self || ""}
+                  onChange={(e) => updateTicketLineItem(itemIdx, "cancellation_charges_self", e.target.value, isEdit)}
+                  className="h-6 w-20 text-[10px] font-mono text-right"
+                />
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-slate-400">Supplier:</span>
+                <Input
+                  type="number"
+                  placeholder="0.00"
+                  value={item.cancellation_charges_supplier || ""}
+                  onChange={(e) => updateTicketLineItem(itemIdx, "cancellation_charges_supplier", e.target.value, isEdit)}
+                  className="h-6 w-20 text-[10px] font-mono text-right"
+                />
+              </div>
             </div>
-            <div>
-              <span className="text-slate-400 text-[10px] block uppercase font-bold tracking-wider">Customer Net (Bill)</span>
-              <span className="font-bold text-emerald-400 text-[13px]">{item.customer_net?.toLocaleString() || "0.00"}</span>
+
+            {/* Totals Summary (Matching ERP Screenshot Exactly) */}
+            <div className="p-3 bg-slate-900 text-white rounded-lg font-mono text-[11px] space-y-1 shadow">
+              <div className="grid grid-cols-2 gap-x-4 border-b border-slate-800 pb-1.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                <span>Receivables &amp; Gross</span>
+                <span className="text-right">Payables &amp; Net</span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-x-4 pt-1">
+                <div className="flex justify-between text-slate-300">
+                  <span>Customer Gross:</span>
+                  <span className="font-bold">{item.customer_gross?.toLocaleString() || "0.00"}</span>
+                </div>
+                <div className="flex justify-between text-emerald-400 font-bold">
+                  <span>Customer Net:</span>
+                  <span>{item.customer_net?.toLocaleString() || "0.00"}</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-x-4">
+                <div className="flex justify-between text-slate-400 text-[10px]">
+                  <span>Invoice Rec. Gross:</span>
+                  <span>{item.customer_gross?.toLocaleString() || "0.00"}</span>
+                </div>
+                <div className="flex justify-between text-slate-300 text-[10px]">
+                  <span>Invoice Rec. Net:</span>
+                  <span>{item.customer_net?.toLocaleString() || "0.00"}</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-x-4 border-t border-slate-800/80 pt-1">
+                <div className="flex justify-between text-slate-300">
+                  <span>Supplier Gross:</span>
+                  <span className="font-bold">{item.supplier_gross?.toLocaleString() || "0.00"}</span>
+                </div>
+                <div className="flex justify-between text-amber-400 font-bold">
+                  <span>Supplier Net:</span>
+                  <span>{item.supplier_net?.toLocaleString() || "0.00"}</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-x-4">
+                <div className="flex justify-between text-slate-400 text-[10px]">
+                  <span>Invoice Pay. Gross:</span>
+                  <span>{item.supplier_gross?.toLocaleString() || "0.00"}</span>
+                </div>
+                <div className="flex justify-between text-slate-300 text-[10px]">
+                  <span>Invoice Pay. Net:</span>
+                  <span>{item.supplier_net?.toLocaleString() || "0.00"}</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-x-4 border-t border-slate-800 pt-1">
+                <div className="flex justify-between text-slate-400 text-[10px]">
+                  <span>Supplier Gross W/o WHT:</span>
+                  <span>{item.supplier_gross_wo_wht?.toLocaleString() || item.supplier_gross?.toLocaleString() || "0.00"}</span>
+                </div>
+                <div className="flex justify-between text-right">
+                  <span className="text-slate-400 uppercase font-bold text-[10px]">Agency Profit:</span>
+                  <span className="font-bold text-blue-400 text-[12px]">
+                    + {item.agency_margin?.toLocaleString() || "0.00"}
+                  </span>
+                </div>
+              </div>
             </div>
-            <div>
-              <span className="text-slate-400 text-[10px] block uppercase font-bold tracking-wider">Supplier Gross</span>
-              <span className="font-bold">{item.supplier_gross?.toLocaleString() || "0.00"}</span>
-            </div>
-            <div>
-              <span className="text-slate-400 text-[10px] block uppercase font-bold tracking-wider">Supplier Net (Cost)</span>
-              <span className="font-bold text-amber-400 text-[13px]">{item.supplier_net?.toLocaleString() || "0.00"}</span>
-            </div>
-          </div>
-          <div className="text-right">
-            <span className="text-slate-400 text-[10px] block uppercase font-bold tracking-wider">Agency Margin / Profit</span>
-            <span className="font-mono font-extrabold text-blue-400 text-[14px]">
-              + {item.agency_margin?.toLocaleString() || "0.00"}
-            </span>
+
           </div>
         </div>
       </div>
@@ -1059,7 +1492,7 @@ export default function InvoicesPage() {
           <DialogTrigger className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-[13px] font-medium text-primary-foreground hover:bg-primary/90 shadow-sm transition-colors">
             <Plus className="h-4 w-4" /> New Invoice / Ticket Sale
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[96vw] md:max-w-[94vw] lg:max-w-[1400px] w-[96vw] max-h-[96vh] overflow-y-auto p-5">
+          <DialogContent className="sm:max-w-[96vw] md:max-w-[95vw] lg:max-w-[1400px] w-[96vw] max-h-[96vh] overflow-y-auto p-5">
             <DialogHeader>
               <DialogTitle className="text-lg font-bold flex items-center gap-2">
                 <FileText className="h-5 w-5 text-primary" />
@@ -1068,86 +1501,127 @@ export default function InvoicesPage() {
             </DialogHeader>
 
             <div className="space-y-3.5 pt-1">
-              {/* Top Invoice Header Grid: 8 Columns across desktop for zero vertical waste */}
-              <div className="p-3 bg-slate-100/70 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-800 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5 text-[12px]">
-                <div className="space-y-1">
-                  <Label className="text-[11px] font-semibold">Customer *</Label>
-                  <Select value={newCustomerId} onValueChange={(v) => {
-                    const val = v || "";
-                    setNewCustomerId(val);
-                    const cust = customers.find(c => c._id === val);
-                    if (cust) setNewPrintName(cust.name);
-                  }}>
-                    <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
-                      <SelectValue placeholder="Select Customer">
-                        {(val) => getCustomerName(val)}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>{customers.map((c) => <SelectItem key={c._id} value={c._id}>{c.name}</SelectItem>)}</SelectContent>
-                  </Select>
+              {/* Top Invoice Header Grid (All Green-Ticked Fields in Screenshot) */}
+              <div className="p-3 bg-slate-100/70 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2.5 text-[12px]">
+                {/* Header Row 1: Inv. Date, Customer, Print Name, Pay. Mode, Status, Our XO */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5">
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-semibold">Inv. Date *</Label>
+                    <Input type="date" value={newInvDate} onChange={(e) => setNewInvDate(e.target.value)} className="h-8 text-[12px] bg-white dark:bg-[#161619]" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-semibold">Customer *</Label>
+                    <Select value={newCustomerId} onValueChange={(v) => {
+                      const val = v || "";
+                      setNewCustomerId(val);
+                      const cust = customers.find(c => c._id === val);
+                      if (cust) setNewPrintName(cust.name);
+                    }}>
+                      <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
+                        <SelectValue placeholder="Select Customer">
+                          {(val) => getCustomerName(val)}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>{customers.map((c) => <SelectItem key={c._id} value={c._id}>{c.name}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-semibold">Print Name *</Label>
+                    <Input value={newPrintName} onChange={(e) => setNewPrintName(e.target.value)} placeholder="Print Name" className="h-8 text-[12px] bg-white dark:bg-[#161619]" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-semibold">Pay. Mode *</Label>
+                    <Select value={newPaymentMode} onValueChange={(v) => setNewPaymentMode(v || "CR")}>
+                      <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
+                        <SelectValue>{(val) => val === "CR" ? "CR (Credit)" : val || "CR"}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="CR">CR (Credit)</SelectItem>
+                        <SelectItem value="Cash">Cash</SelectItem>
+                        <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                        <SelectItem value="Cheque">Cheque</SelectItem>
+                        <SelectItem value="Card">Card</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-semibold">Status *</Label>
+                    <Select value={newDocStatus} onValueChange={(v) => setNewDocStatus(v || "Draft")}>
+                      <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
+                        <SelectValue>{(val) => val === "Draft" ? "Draft (D)" : "Confirmed (C)"}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Draft">Draft (D)</SelectItem>
+                        <SelectItem value="Confirmed">Confirmed (C)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-semibold">Our XO</Label>
+                    <Input value={newOurXo} onChange={(e) => setNewOurXo(e.target.value)} placeholder="E" className="h-8 text-[12px] bg-white dark:bg-[#161619]" />
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-[11px] font-semibold">Print Name</Label>
-                  <Input value={newPrintName} onChange={(e) => setNewPrintName(e.target.value)} placeholder="Print Name" className="h-8 text-[12px] bg-white dark:bg-[#161619]" />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[11px] font-semibold">Supplier / BSP</Label>
-                  <Select value={newSupplierId} onValueChange={(v) => setNewSupplierId(v || "")}>
-                    <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
-                      <SelectValue placeholder="BSP / Airline">
-                        {(val) => getSupplierName(val)}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>{suppliers.map((s) => <SelectItem key={s._id} value={s._id}>{s.name} {s.code ? `(${s.code})` : ''}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[11px] font-semibold">Payment Mode</Label>
-                  <Select value={newPaymentMode} onValueChange={(v) => setNewPaymentMode(v || "CR")}>
-                    <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
-                      <SelectValue>{(val) => val === "CR" ? "CR (Credit)" : val || "CR"}</SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="CR">CR (Credit)</SelectItem>
-                      <SelectItem value="Cash">Cash</SelectItem>
-                      <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-                      <SelectItem value="Cheque">Cheque</SelectItem>
-                      <SelectItem value="Card">Card</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[11px] font-semibold">Inv Date</Label>
-                  <Input type="date" value={newInvDate} onChange={(e) => setNewInvDate(e.target.value)} className="h-8 text-[12px] bg-white dark:bg-[#161619]" />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[11px] font-semibold">Adj Date</Label>
-                  <Input type="date" value={newAdjDate} onChange={(e) => setNewAdjDate(e.target.value)} className="h-8 text-[12px] bg-white dark:bg-[#161619]" />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[11px] font-semibold">SPO / Agent</Label>
-                  <Select value={newSpoId} onValueChange={(v) => setNewSpoId(v || "")}>
-                    <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
-                      <SelectValue placeholder="Booking Agent">
-                        {(val) => getAgentName(val)}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>{staffUsers.map((u) => <SelectItem key={u._id} value={u._id}>{u.name} ({u.role})</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[11px] font-semibold">Remarks</Label>
-                  <Select value={newRemarks} onValueChange={(v) => setNewRemarks(v || "NORMAL")}>
-                    <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
-                      <SelectValue>{(val) => val || "NORMAL"}</SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="NORMAL">NORMAL</SelectItem>
-                      <SelectItem value="REISSUE">REISSUE</SelectItem>
-                      <SelectItem value="REFUND">REFUND</SelectItem>
-                      <SelectItem value="DATE CHANGE">DATE CHANGE</SelectItem>
-                    </SelectContent>
-                  </Select>
+
+                {/* Header Row 2: Adj. Date, Cost Center, SPO, Visit Type, Client XO, Remarks, Supplier */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2.5">
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-semibold">Adj. Date</Label>
+                    <Input type="date" value={newAdjDate} onChange={(e) => setNewAdjDate(e.target.value)} className="h-8 text-[12px] bg-white dark:bg-[#161619]" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-semibold">Cost Center</Label>
+                    <Input value={newCostCenter} onChange={(e) => setNewCostCenter(e.target.value)} placeholder="Search" className="h-8 text-[12px] bg-white dark:bg-[#161619]" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-semibold">SPO / Agent</Label>
+                    <Select value={newSpoId} onValueChange={(v) => setNewSpoId(v || "")}>
+                      <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
+                        <SelectValue placeholder="Booking Agent">
+                          {(val) => getAgentName(val)}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>{staffUsers.map((u) => <SelectItem key={u._id} value={u._id}>{u.name} ({u.role})</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-semibold">Visit Type *</Label>
+                    <Select value={newVisitType} onValueChange={(v) => setNewVisitType(v || "Visitor")}>
+                      <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Visitor">Visitor</SelectItem>
+                        <SelectItem value="Corporate">Corporate</SelectItem>
+                        <SelectItem value="Government">Government</SelectItem>
+                        <SelectItem value="Walk-in">Walk-in</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-semibold">Client XO</Label>
+                    <Input value={newClientXo} onChange={(e) => setNewClientXo(e.target.value)} placeholder="Client XO" className="h-8 text-[12px] bg-white dark:bg-[#161619]" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-semibold">Remarks</Label>
+                    <Select value={newRemarks} onValueChange={(v) => setNewRemarks(v || "NORMAL")}>
+                      <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="NORMAL">NORMAL</SelectItem>
+                        <SelectItem value="REISSUE">REISSUE</SelectItem>
+                        <SelectItem value="REFUND">REFUND</SelectItem>
+                        <SelectItem value="DATE CHANGE">DATE CHANGE</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-semibold">Supplier / BSP</Label>
+                    <Select value={newSupplierId} onValueChange={(v) => setNewSupplierId(v || "")}>
+                      <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
+                        <SelectValue placeholder="BSP / Airline">
+                          {(val) => getSupplierName(val)}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>{suppliers.map((s) => <SelectItem key={s._id} value={s._id}>{s.name} {s.code ? `(${s.code})` : ''}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </div>
 
@@ -1471,9 +1945,9 @@ export default function InvoicesPage() {
         </CardContent>
       </Card>
 
-      {/* Edit Invoice Dialog - Wide and Tall */}
+      {/* Edit Invoice Dialog - Full ERP Clone */}
       <Dialog open={!!editInvoiceId} onOpenChange={(open) => !open && setEditInvoiceId(null)}>
-        <DialogContent className="sm:max-w-[96vw] md:max-w-[94vw] lg:max-w-[1400px] w-[96vw] max-h-[96vh] overflow-y-auto p-5">
+        <DialogContent className="sm:max-w-[96vw] md:max-w-[95vw] lg:max-w-[1400px] w-[96vw] max-h-[96vh] overflow-y-auto p-5">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold flex items-center gap-2">
               <Pencil className="h-5 w-5 text-primary" /> Edit Ticket Invoice
@@ -1483,80 +1957,104 @@ export default function InvoicesPage() {
             <div className="flex items-center justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
           ) : (
             <div className="space-y-3.5 pt-1">
-              <div className="p-3 bg-slate-100/70 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-800 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5 text-[12px]">
-                <div className="space-y-1">
-                  <Label className="text-[11px] font-semibold">Customer *</Label>
-                  <Select value={editCustomerId} onValueChange={(v) => setEditCustomerId(v || "")}>
-                    <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
-                      <SelectValue placeholder="Select Customer">
-                        {(val) => getCustomerName(val)}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>{customers.map((c) => <SelectItem key={c._id} value={c._id}>{c.name}</SelectItem>)}</SelectContent>
-                  </Select>
+              {/* Top Header Grid for Edit Modal */}
+              <div className="p-3 bg-slate-100/70 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2.5 text-[12px]">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5">
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-semibold">Customer *</Label>
+                    <Select value={editCustomerId} onValueChange={(v) => setEditCustomerId(v || "")}>
+                      <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
+                        <SelectValue placeholder="Select Customer">
+                          {(val) => getCustomerName(val)}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>{customers.map((c) => <SelectItem key={c._id} value={c._id}>{c.name}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-semibold">Print Name *</Label>
+                    <Input value={editPrintName} onChange={(e) => setEditPrintName(e.target.value)} className="h-8 text-[12px] bg-white dark:bg-[#161619]" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-semibold">Pay. Mode *</Label>
+                    <Select value={editPaymentMode} onValueChange={(v) => setEditPaymentMode(v || "CR")}>
+                      <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
+                        <SelectValue>{(val) => val === "CR" ? "CR (Credit)" : val || "CR"}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="CR">CR (Credit)</SelectItem>
+                        <SelectItem value="Cash">Cash</SelectItem>
+                        <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                        <SelectItem value="Cheque">Cheque</SelectItem>
+                        <SelectItem value="Card">Card</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-semibold">Status *</Label>
+                    <Select value={editDocStatus} onValueChange={(v) => setEditDocStatus(v || "Draft")}>
+                      <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
+                        <SelectValue>{(val) => val === "Draft" ? "Draft (D)" : "Confirmed (C)"}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Draft">Draft (D)</SelectItem>
+                        <SelectItem value="Confirmed">Confirmed (C)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-semibold">Our XO</Label>
+                    <Input value={editOurXo} onChange={(e) => setEditOurXo(e.target.value)} placeholder="E" className="h-8 text-[12px] bg-white dark:bg-[#161619]" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-semibold">Client XO</Label>
+                    <Input value={editClientXo} onChange={(e) => setEditClientXo(e.target.value)} placeholder="Client XO" className="h-8 text-[12px] bg-white dark:bg-[#161619]" />
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-[11px] font-semibold">Print Name</Label>
-                  <Input value={editPrintName} onChange={(e) => setEditPrintName(e.target.value)} className="h-8 text-[12px] bg-white dark:bg-[#161619]" />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[11px] font-semibold">Supplier / BSP</Label>
-                  <Select value={editSupplierId} onValueChange={(v) => setEditSupplierId(v || "")}>
-                    <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
-                      <SelectValue placeholder="BSP / Airline">
-                        {(val) => getSupplierName(val)}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>{suppliers.map((s) => <SelectItem key={s._id} value={s._id}>{s.name} {s.code ? `(${s.code})` : ''}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[11px] font-semibold">Payment Mode</Label>
-                  <Select value={editPaymentMode} onValueChange={(v) => setEditPaymentMode(v || "CR")}>
-                    <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
-                      <SelectValue>{(val) => val === "CR" ? "CR (Credit)" : val || "CR"}</SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="CR">CR (Credit)</SelectItem>
-                      <SelectItem value="Cash">Cash</SelectItem>
-                      <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-                      <SelectItem value="Cheque">Cheque</SelectItem>
-                      <SelectItem value="Card">Card</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[11px] font-semibold">SPO / Agent</Label>
-                  <Select value={editSpoId} onValueChange={(v) => setEditSpoId(v || "")}>
-                    <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
-                      <SelectValue placeholder="Booking Agent">
-                        {(val) => getAgentName(val)}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>{staffUsers.map((u) => <SelectItem key={u._id} value={u._id}>{u.name} ({u.role})</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[11px] font-semibold">Remarks</Label>
-                  <Select value={editRemarks} onValueChange={(v) => setEditRemarks(v || "NORMAL")}>
-                    <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
-                      <SelectValue>{(val) => val || "NORMAL"}</SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="NORMAL">NORMAL</SelectItem>
-                      <SelectItem value="REISSUE">REISSUE</SelectItem>
-                      <SelectItem value="REFUND">REFUND</SelectItem>
-                      <SelectItem value="DATE CHANGE">DATE CHANGE</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[11px] font-semibold">Cost Center</Label>
-                  <Input value={editCostCenter} onChange={(e) => setEditCostCenter(e.target.value)} placeholder="Cost Center" className="h-8 text-[12px] bg-white dark:bg-[#161619]" />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[11px] font-semibold">Our XO</Label>
-                  <Input value={editOurXo} onChange={(e) => setEditOurXo(e.target.value)} placeholder="E" className="h-8 text-[12px] bg-white dark:bg-[#161619]" />
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-2.5">
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-semibold">Adj. Date</Label>
+                    <Input type="date" value={editAdjDate} onChange={(e) => setEditAdjDate(e.target.value)} className="h-8 text-[12px] bg-white dark:bg-[#161619]" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-semibold">Cost Center</Label>
+                    <Input value={editCostCenter} onChange={(e) => setEditCostCenter(e.target.value)} placeholder="Cost Center" className="h-8 text-[12px] bg-white dark:bg-[#161619]" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-semibold">SPO / Agent</Label>
+                    <Select value={editSpoId} onValueChange={(v) => setEditSpoId(v || "")}>
+                      <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
+                        <SelectValue placeholder="Booking Agent">
+                          {(val) => getAgentName(val)}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>{staffUsers.map((u) => <SelectItem key={u._id} value={u._id}>{u.name} ({u.role})</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-semibold">Remarks</Label>
+                    <Select value={editRemarks} onValueChange={(v) => setEditRemarks(v || "NORMAL")}>
+                      <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="NORMAL">NORMAL</SelectItem>
+                        <SelectItem value="REISSUE">REISSUE</SelectItem>
+                        <SelectItem value="REFUND">REFUND</SelectItem>
+                        <SelectItem value="DATE CHANGE">DATE CHANGE</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-semibold">Supplier / BSP</Label>
+                    <Select value={editSupplierId} onValueChange={(v) => setEditSupplierId(v || "")}>
+                      <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
+                        <SelectValue placeholder="BSP / Airline">
+                          {(val) => getSupplierName(val)}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>{suppliers.map((s) => <SelectItem key={s._id} value={s._id}>{s.name} {s.code ? `(${s.code})` : ''}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </div>
 

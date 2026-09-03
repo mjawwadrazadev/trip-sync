@@ -76,6 +76,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           passport_issue_date: li.passport_issue_date || "",
           ticket_number: li.ticket_number || "",
           conjunction_ticket_no: li.conjunction_ticket_no || "",
+          conjunction_route: li.conjunction_route || "",
           gds_pnr: li.gds_pnr || "",
           gds_name: li.gds_name || "",
           airline_name: li.airline_name || "",
@@ -107,6 +108,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           tax_city: parseFloat(li.tax_city) || 0,
           tax_airline_city: parseFloat(li.tax_airline_city) || 0,
           other_taxes: parseFloat(li.other_taxes) || 0,
+          airline_city_taxes: Array.isArray(li.airline_city_taxes) ? li.airline_city_taxes : [],
+          city_taxes: Array.isArray(li.city_taxes) ? li.city_taxes : [],
 
           // Commercials & Deductions
           wht_percent: parseFloat(li.wht_percent) || 0,
@@ -115,9 +118,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           commission_amount: parseFloat(li.commission_amount) || 0,
           discount_percent: parseFloat(li.discount_percent) || 0,
           discount_amount: parseFloat(li.discount_amount) || 0,
+          psf_percent: parseFloat(li.psf_percent) || 0,
           psf_amount: parseFloat(li.psf_amount) || 0,
           gst_percent: parseFloat(li.gst_percent) || 0,
           gst_amount: parseFloat(li.gst_amount) || 0,
+          auto_update: li.auto_update !== undefined ? Boolean(li.auto_update) : true,
           cancellation_charges_self: parseFloat(li.cancellation_charges_self) || 0,
           cancellation_charges_supplier: parseFloat(li.cancellation_charges_supplier) || 0,
 

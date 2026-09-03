@@ -30,6 +30,7 @@ export interface IInvoiceLineItem extends Document {
   passport_issue_date: string;
   ticket_number: string;
   conjunction_ticket_no: string;
+  conjunction_route: string;
   gds_pnr: string;
   gds_name: string;
   airline_name: string;
@@ -61,6 +62,8 @@ export interface IInvoiceLineItem extends Document {
   tax_city: number;
   tax_airline_city: number;
   other_taxes: number;
+  airline_city_taxes: Array<{ code: string; amount: number }>;
+  city_taxes: Array<{ code: string; amount: number }>;
   
   // Commercials & Deductions
   wht_percent: number;
@@ -69,9 +72,11 @@ export interface IInvoiceLineItem extends Document {
   commission_amount: number;
   discount_percent: number;
   discount_amount: number;
+  psf_percent: number;
   psf_amount: number;
   gst_percent: number;
   gst_amount: number;
+  auto_update: boolean;
   cancellation_charges_self: number;
   cancellation_charges_supplier: number;
   
@@ -106,6 +111,7 @@ const InvoiceLineItemSchema = new Schema<IInvoiceLineItem>(
     passport_issue_date: { type: String, default: "" },
     ticket_number: { type: String, default: "" },
     conjunction_ticket_no: { type: String, default: "" },
+    conjunction_route: { type: String, default: "" },
     gds_pnr: { type: String, default: "" },
     gds_name: { type: String, default: "" },
     airline_name: { type: String, default: "" },
@@ -147,6 +153,18 @@ const InvoiceLineItemSchema = new Schema<IInvoiceLineItem>(
     tax_city: { type: Number, default: 0 },
     tax_airline_city: { type: Number, default: 0 },
     other_taxes: { type: Number, default: 0 },
+    airline_city_taxes: [
+      {
+        code: { type: String, default: "XT" },
+        amount: { type: Number, default: 0 },
+      },
+    ],
+    city_taxes: [
+      {
+        code: { type: String, default: "" },
+        amount: { type: Number, default: 0 },
+      },
+    ],
 
     // Commercials & Deductions
     wht_percent: { type: Number, default: 0 },
@@ -155,9 +173,11 @@ const InvoiceLineItemSchema = new Schema<IInvoiceLineItem>(
     commission_amount: { type: Number, default: 0 },
     discount_percent: { type: Number, default: 0 },
     discount_amount: { type: Number, default: 0 },
+    psf_percent: { type: Number, default: 0 },
     psf_amount: { type: Number, default: 0 },
     gst_percent: { type: Number, default: 0 },
     gst_amount: { type: Number, default: 0 },
+    auto_update: { type: Boolean, default: true },
     cancellation_charges_self: { type: Number, default: 0 },
     cancellation_charges_supplier: { type: Number, default: 0 },
 

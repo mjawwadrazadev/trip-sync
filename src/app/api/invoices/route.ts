@@ -268,6 +268,7 @@ export async function POST(req: NextRequest) {
         passport_issue_date: item.passport_issue_date || "",
         ticket_number: item.ticket_number || "",
         conjunction_ticket_no: item.conjunction_ticket_no || "",
+        conjunction_route: item.conjunction_route || "",
         gds_pnr: item.gds_pnr || "",
         gds_name: item.gds_name || "",
         airline_name: item.airline_name || "",
@@ -299,6 +300,8 @@ export async function POST(req: NextRequest) {
         tax_city: parseFloat(String(item.tax_city || 0)) || 0,
         tax_airline_city: parseFloat(String(item.tax_airline_city || 0)) || 0,
         other_taxes: parseFloat(String(item.other_taxes || 0)) || 0,
+        airline_city_taxes: Array.isArray(item.airline_city_taxes) ? item.airline_city_taxes : [],
+        city_taxes: Array.isArray(item.city_taxes) ? item.city_taxes : [],
 
         // Commercials & Deductions
         wht_percent: parseFloat(String(item.wht_percent || 0)) || 0,
@@ -307,9 +310,11 @@ export async function POST(req: NextRequest) {
         commission_amount: parseFloat(String(item.commission_amount || 0)) || 0,
         discount_percent: parseFloat(String(item.discount_percent || 0)) || 0,
         discount_amount: parseFloat(String(item.discount_amount || 0)) || 0,
+        psf_percent: parseFloat(String(item.psf_percent || 0)) || 0,
         psf_amount: parseFloat(String(item.psf_amount || 0)) || 0,
         gst_percent: parseFloat(String(item.gst_percent || 0)) || 0,
         gst_amount: parseFloat(String(item.gst_amount || 0)) || 0,
+        auto_update: item.auto_update !== undefined ? Boolean(item.auto_update) : true,
         cancellation_charges_self: parseFloat(String(item.cancellation_charges_self || 0)) || 0,
         cancellation_charges_supplier: parseFloat(String(item.cancellation_charges_supplier || 0)) || 0,
 
