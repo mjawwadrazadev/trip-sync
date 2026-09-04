@@ -424,11 +424,17 @@ export default function InvoicesPage() {
       cityTaxSum;
 
     const grossFare = baseFare + taxes;
+    
+    // Commission on Base Fare
     const commPct = parseFloat(item.commission_percent || "0") || 0;
-    const commAmt = (baseFare * commPct) / 100;
+    let commAmt = (baseFare * commPct) / 100;
+    if (commPct === 0 && item.commission_amount && parseFloat(item.commission_amount) > 0) {
+      commAmt = parseFloat(item.commission_amount);
+    }
 
+    // Withholding Tax is directly linked to Commission (not Base Fare)
     const whtPct = parseFloat(item.wht_percent || "0") || 0;
-    const whtAmt = (baseFare * whtPct) / 100;
+    const whtAmt = (commAmt * whtPct) / 100;
 
     const disPct = parseFloat(item.discount_percent || "0") || 0;
     const disAmt = (grossFare * disPct) / 100;
@@ -1288,19 +1294,19 @@ export default function InvoicesPage() {
             {/* Commercials, WHT & Deductions Matrix */}
             <div className="p-2.5 bg-white dark:bg-[#111113] rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
               <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[10px]">
-                {/* WHT & DIS */}
+                {/* Row 1: COM (Commission) & DIS (Discount) */}
                 <div className="flex items-center justify-between gap-1">
-                  <span className="w-12 font-bold text-slate-600 dark:text-slate-400">WHT</span>
+                  <span className="w-12 font-bold text-slate-600 dark:text-slate-400">COM</span>
                   <Input
                     type="number"
                     placeholder="%"
-                    value={item.wht_percent || ""}
-                    onChange={(e) => updateTicketLineItem(itemIdx, "wht_percent", e.target.value, isEdit)}
+                    value={item.commission_percent || ""}
+                    onChange={(e) => updateTicketLineItem(itemIdx, "commission_percent", e.target.value, isEdit)}
                     className="h-6 w-14 text-[10px] font-mono"
                   />
                   <Input
                     readOnly
-                    value={item.wht_amount || "0.00"}
+                    value={item.commission_amount || "0.00"}
                     className="h-6 flex-1 text-[10px] font-mono bg-slate-50 dark:bg-slate-900 text-right"
                   />
                 </div>
@@ -1320,19 +1326,19 @@ export default function InvoicesPage() {
                   />
                 </div>
 
-                {/* COM & PSF/P */}
+                {/* Row 2: WHT (Withholding Tax on Commission) & PSF/P */}
                 <div className="flex items-center justify-between gap-1">
-                  <span className="w-12 font-bold text-slate-600 dark:text-slate-400">COM</span>
+                  <span className="w-12 font-bold text-slate-600 dark:text-slate-400" title="Withholding Tax on Commission">WHT</span>
                   <Input
                     type="number"
                     placeholder="%"
-                    value={item.commission_percent || ""}
-                    onChange={(e) => updateTicketLineItem(itemIdx, "commission_percent", e.target.value, isEdit)}
+                    value={item.wht_percent || ""}
+                    onChange={(e) => updateTicketLineItem(itemIdx, "wht_percent", e.target.value, isEdit)}
                     className="h-6 w-14 text-[10px] font-mono"
                   />
                   <Input
                     readOnly
-                    value={item.commission_amount || "0.00"}
+                    value={item.wht_amount || "0.00"}
                     className="h-6 flex-1 text-[10px] font-mono bg-slate-50 dark:bg-slate-900 text-right"
                   />
                 </div>
