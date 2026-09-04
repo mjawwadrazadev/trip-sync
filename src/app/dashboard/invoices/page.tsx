@@ -817,8 +817,8 @@ export default function InvoicesPage() {
             </div>
           </div>
 
-          {/* Row 2: Ticket No, PNR, GDS, Airline, Sector, Doc, Type, Our XO */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-7 gap-2.5">
+          {/* Row 2: Ticket No, PNR, GDS, Airline, Supplier/BSP, Sector, Doc, Type */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2.5">
             <div className="space-y-1">
               <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Ticket No. *</Label>
               <Input
@@ -860,6 +860,31 @@ export default function InvoicesPage() {
                 onChange={(e) => updateTicketLineItem(itemIdx, "airline_name", e.target.value.toUpperCase(), isEdit)}
                 className="h-8 text-[12px] uppercase bg-white dark:bg-[#161619]"
               />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Supplier / BSP *</Label>
+              <Select
+                value={item.supplier_id || (isEdit ? editSupplierId : newSupplierId) || ""}
+                onValueChange={(v) => {
+                  const val = v || "";
+                  updateTicketLineItem(itemIdx, "supplier_id", val, isEdit);
+                  if (isEdit) setEditSupplierId(val);
+                  else setNewSupplierId(val);
+                }}
+              >
+                <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
+                  <SelectValue placeholder="BSP / Airline">
+                    {(val) => getSupplierName(val)}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {suppliers.map((s) => (
+                    <SelectItem key={s._id} value={s._id}>
+                      {s.name} {s.code ? `(${s.code})` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1">
               <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Sector *</Label>
@@ -1503,8 +1528,8 @@ export default function InvoicesPage() {
             <div className="space-y-3.5 pt-1">
               {/* Top Invoice Header Grid (All Green-Ticked Fields in Screenshot) */}
               <div className="p-3 bg-slate-100/70 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2.5 text-[12px]">
-                {/* Header Row 1: Inv. Date, Customer, Print Name, Pay. Mode, Status, Our XO */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5">
+                {/* Header Row 1: Inv. Date, Customer, Print Name, Pay. Mode, Status */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5">
                   <div className="space-y-1">
                     <Label className="text-[11px] font-semibold">Inv. Date *</Label>
                     <Input type="date" value={newInvDate} onChange={(e) => setNewInvDate(e.target.value)} className="h-8 text-[12px] bg-white dark:bg-[#161619]" />
@@ -1556,14 +1581,10 @@ export default function InvoicesPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-[11px] font-semibold">Our XO</Label>
-                    <Input value={newOurXo} onChange={(e) => setNewOurXo(e.target.value)} placeholder="E" className="h-8 text-[12px] bg-white dark:bg-[#161619]" />
-                  </div>
                 </div>
 
-                {/* Header Row 2: Adj. Date, Cost Center, SPO, Visit Type, Client XO, Remarks, Supplier */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2.5">
+                {/* Header Row 2: Adj. Date, Cost Center, SPO, Visit Type, Remarks */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5">
                   <div className="space-y-1">
                     <Label className="text-[11px] font-semibold">Adj. Date</Label>
                     <Input type="date" value={newAdjDate} onChange={(e) => setNewAdjDate(e.target.value)} className="h-8 text-[12px] bg-white dark:bg-[#161619]" />
@@ -1596,10 +1617,6 @@ export default function InvoicesPage() {
                     </Select>
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-[11px] font-semibold">Client XO</Label>
-                    <Input value={newClientXo} onChange={(e) => setNewClientXo(e.target.value)} placeholder="Client XO" className="h-8 text-[12px] bg-white dark:bg-[#161619]" />
-                  </div>
-                  <div className="space-y-1">
                     <Label className="text-[11px] font-semibold">Remarks</Label>
                     <Select value={newRemarks} onValueChange={(v) => setNewRemarks(v || "NORMAL")}>
                       <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]"><SelectValue /></SelectTrigger>
@@ -1609,17 +1626,6 @@ export default function InvoicesPage() {
                         <SelectItem value="REFUND">REFUND</SelectItem>
                         <SelectItem value="DATE CHANGE">DATE CHANGE</SelectItem>
                       </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[11px] font-semibold">Supplier / BSP</Label>
-                    <Select value={newSupplierId} onValueChange={(v) => setNewSupplierId(v || "")}>
-                      <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
-                        <SelectValue placeholder="BSP / Airline">
-                          {(val) => getSupplierName(val)}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>{suppliers.map((s) => <SelectItem key={s._id} value={s._id}>{s.name} {s.code ? `(${s.code})` : ''}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                 </div>
@@ -1959,7 +1965,7 @@ export default function InvoicesPage() {
             <div className="space-y-3.5 pt-1">
               {/* Top Header Grid for Edit Modal */}
               <div className="p-3 bg-slate-100/70 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2.5 text-[12px]">
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                   <div className="space-y-1">
                     <Label className="text-[11px] font-semibold">Customer *</Label>
                     <Select value={editCustomerId} onValueChange={(v) => setEditCustomerId(v || "")}>
@@ -2002,17 +2008,9 @@ export default function InvoicesPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-[11px] font-semibold">Our XO</Label>
-                    <Input value={editOurXo} onChange={(e) => setEditOurXo(e.target.value)} placeholder="E" className="h-8 text-[12px] bg-white dark:bg-[#161619]" />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[11px] font-semibold">Client XO</Label>
-                    <Input value={editClientXo} onChange={(e) => setEditClientXo(e.target.value)} placeholder="Client XO" className="h-8 text-[12px] bg-white dark:bg-[#161619]" />
-                  </div>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-2.5">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                   <div className="space-y-1">
                     <Label className="text-[11px] font-semibold">Adj. Date</Label>
                     <Input type="date" value={editAdjDate} onChange={(e) => setEditAdjDate(e.target.value)} className="h-8 text-[12px] bg-white dark:bg-[#161619]" />
@@ -2042,17 +2040,6 @@ export default function InvoicesPage() {
                         <SelectItem value="REFUND">REFUND</SelectItem>
                         <SelectItem value="DATE CHANGE">DATE CHANGE</SelectItem>
                       </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[11px] font-semibold">Supplier / BSP</Label>
-                    <Select value={editSupplierId} onValueChange={(v) => setEditSupplierId(v || "")}>
-                      <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
-                        <SelectValue placeholder="BSP / Airline">
-                          {(val) => getSupplierName(val)}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>{suppliers.map((s) => <SelectItem key={s._id} value={s._id}>{s.name} {s.code ? `(${s.code})` : ''}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                 </div>
