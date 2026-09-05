@@ -1,0 +1,64 @@
+import { NextRequest, NextResponse } from "next/server";
+import { withAuth, successResponse, errorResponse } from "@/lib/api-helpers";
+import { Voucher } from "@/models";
+
+// GET /api/vouchers?type=RV&status=Draft&page=1&limit=20&search=
+export async function GET(req: NextRequest) {
+  return withAuth(async (user) => {
+    const { searchParams } = new URL(req.url);
+
+    const filter: Record<string, unknown> = { tenant_id: user.tenant_id };
+
+    const type = searchParams.get("type");
+    if (type && type !== "all") filter.voucher_type = type;
+
+    const status = searchParams.get("status");
+    if (status && status !== "all") filter.status = status;
+
+    const search = searchParams.get("search");
+    if (search) {
+      filter.$or = [
+        { voucher_number: { $regex: search, $options: "i" } },
+        { name_on_voucher: { $regex: search, $options: "i" } },
+        { manual_receipt_no: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "20");
+    const skip = (page - 1) * limit;
+
+    const [vouchers, total] = await Promise.all([
+      Voucher.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      Voucher.countDocuments(filter),
+    ]);
+
+    return successResponse({ vouchers, total, page, totalPages: Math.ceil(total / limit) });
+  });
+}
+
+// POST /api/vouchers — create new voucher with auto-number
+export async function POST(req: NextRequest) {
+  return withAuth(async (user) => {
+    const body = await req.json();
+
+    if (!body.voucher_type || !body.voucher_date) {
+      return errorResponse("voucher_type and voucher_date are required");
+    }
+
+    const prefixMap: Record<string, string> = { RV: "R", PV: "P", JV: "J", DN: "DN", CD: "CD" };
+    const prefix = prefixMap[body.voucher_type] || "V";
+    const count = await Voucher.countDocuments({ tenant_id: user.tenant_id, voucher_type: body.voucher_type });
+    const voucherNumber = `${prefix}${String(count + 1).padStart(5, "0")}`;
+
+    const voucher = await Voucher.create({
+      ...body,
+      tenant_id: user.tenant_id,
+      voucher_number: voucherNumber,
+      created_by: user.user_id,
+      status: "Draft",
+    });
+
+    return successResponse({ voucher }, 201);
+  });
+}

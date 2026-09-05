@@ -31,6 +31,7 @@ import {
   UserCheck,
   Calendar,
   Building2,
+  BookOpen,
 } from "lucide-react";
 
 interface NavChild {
@@ -65,6 +66,19 @@ const navItems: NavItem[] = [
   { href: "/dashboard/customers", label: "Customers", icon: Users },
   { href: "/dashboard/suppliers", label: "Suppliers", icon: Building2 },
   { href: "/dashboard/payments", label: "Payments", icon: Wallet },
+  {
+    href: "/dashboard/vouchers",
+    label: "Vouchers",
+    icon: BookOpen,
+    children: [
+      { href: "/dashboard/vouchers", label: "All Vouchers", type: null },
+      { href: "/dashboard/vouchers?type=RV", label: "RV — Receipt", type: "RV" },
+      { href: "/dashboard/vouchers?type=PV", label: "PV — Payment", type: "PV" },
+      { href: "/dashboard/vouchers?type=JV", label: "JV — Journal", type: "JV" },
+      { href: "/dashboard/vouchers?type=DN", label: "DN — Debit Note", type: "DN" },
+      { href: "/dashboard/vouchers?type=CD", label: "CD — Cash Deposit", type: "CD" },
+    ],
+  },
   { href: "/dashboard/expenses", label: "Expenses", icon: Receipt },
   { href: "/dashboard/commissions", label: "Commissions", icon: TrendingUp },
   { href: "/dashboard/approvals", label: "Approvals", icon: CheckCircle },
