@@ -506,7 +506,8 @@ export default function VouchersPage() {
           </div>
 
           {/* Table header */}
-          <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
+          <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden overflow-x-auto">
+
             <div className="grid text-[11px] font-semibold uppercase tracking-wide text-gray-500 bg-gray-50 dark:bg-[#111113] px-2 py-1.5"
               style={{ gridTemplateColumns: "48px 80px 90px 100px 1fr 160px 96px 96px 36px" }}>
               <span>Br</span>
@@ -876,7 +877,8 @@ export default function VouchersPage() {
 
       {/* â”€â”€ Create Dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
-        <DialogContent className="max-w-[92vw] w-full max-h-[92vh] overflow-y-auto">
+      <DialogContent className="w-[98vw] max-w-[1400px] max-h-[92vh] overflow-y-auto overflow-x-hidden">
+
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-sm font-bold ${VOUCHER_TYPES.find((t) => t.value === createType)?.color}`}>
@@ -900,7 +902,8 @@ export default function VouchersPage() {
 
       {/* â”€â”€ Edit Dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <Dialog open={!!showEdit} onOpenChange={(o) => { if (!o) setShowEdit(null); }}>
-        <DialogContent className="max-w-[92vw] w-full max-h-[92vh] overflow-y-auto">
+      <DialogContent className="w-[98vw] max-w-[1400px] max-h-[92vh] overflow-y-auto overflow-x-hidden">
+
           {showEdit && (
             <>
               <DialogHeader>
