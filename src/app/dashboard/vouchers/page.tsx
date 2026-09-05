@@ -508,125 +508,126 @@ export default function VouchersPage() {
 
           {/* Table header */}
           <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden overflow-x-auto">
+            <div className="min-w-[900px]">
+              <div className="grid text-[11px] font-semibold uppercase tracking-wide text-gray-500 bg-gray-50 dark:bg-[#111113] px-2 py-1.5"
+                style={{ gridTemplateColumns: "48px 80px 90px 100px 1fr 160px 96px 96px 36px" }}>
+                <span>Br</span>
+                <span>Ref Code</span>
+                <span>Ref No</span>
+                <span>Adj Date</span>
+                <span>Description</span>
+                <span>Account Code</span>
+                <span className="text-right">Debit</span>
+                <span className="text-right">Credit</span>
+                <span></span>
+              </div>
 
-            <div className="grid text-[11px] font-semibold uppercase tracking-wide text-gray-500 bg-gray-50 dark:bg-[#111113] px-2 py-1.5"
-              style={{ gridTemplateColumns: "48px 80px 90px 100px 1fr 160px 96px 96px 36px" }}>
-              <span>Br</span>
-              <span>Ref Code</span>
-              <span>Ref No</span>
-              <span>Adj Date</span>
-              <span>Description</span>
-              <span>Account Code</span>
-              <span className="text-right">Debit</span>
-              <span className="text-right">Credit</span>
-              <span></span>
-            </div>
-
-            <div className="divide-y divide-gray-100 dark:divide-gray-800/60">
-              {form.entries.map((entry, idx) => (
-                <div
-                  key={idx}
-                  className="grid items-center gap-1 px-2 py-1 hover:bg-gray-50/50 dark:hover:bg-[#111113]/50"
-                  style={{ gridTemplateColumns: "48px 80px 90px 100px 1fr 160px 96px 96px 36px" }}
-                >
-                  <Input
-                    className="h-7 text-xs px-1.5"
-                    value={entry.branch}
-                    onChange={(e) => updateEntry(idx, "branch", e.target.value)}
-                    disabled={isPosted}
-                    maxLength={4}
-                  />
-                  <Input
-                    className="h-7 text-xs px-1.5"
-                    value={entry.ref_code}
-                    onChange={(e) => updateEntry(idx, "ref_code", e.target.value)}
-                    disabled={isPosted}
-                    placeholder="RC"
-                  />
-                  <Input
-                    className="h-7 text-xs px-1.5"
-                    value={entry.ref_no}
-                    onChange={(e) => updateEntry(idx, "ref_no", e.target.value)}
-                    disabled={isPosted}
-                    placeholder="Ref #"
-                  />
-                  <Input
-                    type="date"
-                    className="h-7 text-xs px-1.5"
-                    value={entry.adj_date}
-                    onChange={(e) => updateEntry(idx, "adj_date", e.target.value)}
-                    disabled={isPosted}
-                  />
-                  <Input
-                    className="h-7 text-xs px-1.5"
-                    value={entry.description}
-                    onChange={(e) => updateEntry(idx, "description", e.target.value)}
-                    disabled={isPosted}
-                    placeholder="Description"
-                  />
-                  <div className="relative">
+              <div className="divide-y divide-gray-100 dark:divide-gray-800/60">
+                {form.entries.map((entry, idx) => (
+                  <div
+                    key={idx}
+                    className="grid items-center gap-1 px-2 py-1 hover:bg-gray-50/50 dark:hover:bg-[#111113]/50"
+                    style={{ gridTemplateColumns: "48px 80px 90px 100px 1fr 160px 96px 96px 36px" }}
+                  >
                     <Input
                       className="h-7 text-xs px-1.5"
-                      value={entry.account_code}
-                      onChange={(e) => updateEntry(idx, "account_code", e.target.value)}
+                      value={entry.branch}
+                      onChange={(e) => updateEntry(idx, "branch", e.target.value)}
                       disabled={isPosted}
-                      placeholder="Account"
-                      list={`acc-suggestions-${idx}`}
-                      onFocus={() => setSuggestionFor(idx)}
-                      onBlur={() => setSuggestionFor(null)}
+                      maxLength={4}
                     />
-                    <datalist id={`acc-suggestions-${idx}`}>
-                      {accountSuggestions.map((s) => (
-                        <option key={s} value={s} />
-                      ))}
-                    </datalist>
-                    {suggestionFor === idx && (
-                      <div className="absolute z-50 bg-white dark:bg-[#1a1a1d] border border-gray-200 dark:border-gray-700 rounded-md shadow-lg mt-1 max-h-36 overflow-y-auto w-48 text-xs hidden" />
-                    )}
+                    <Input
+                      className="h-7 text-xs px-1.5"
+                      value={entry.ref_code}
+                      onChange={(e) => updateEntry(idx, "ref_code", e.target.value)}
+                      disabled={isPosted}
+                      placeholder="RC"
+                    />
+                    <Input
+                      className="h-7 text-xs px-1.5"
+                      value={entry.ref_no}
+                      onChange={(e) => updateEntry(idx, "ref_no", e.target.value)}
+                      disabled={isPosted}
+                      placeholder="Ref #"
+                    />
+                    <Input
+                      type="date"
+                      className="h-7 text-xs px-1.5"
+                      value={entry.adj_date}
+                      onChange={(e) => updateEntry(idx, "adj_date", e.target.value)}
+                      disabled={isPosted}
+                    />
+                    <Input
+                      className="h-7 text-xs px-1.5"
+                      value={entry.description}
+                      onChange={(e) => updateEntry(idx, "description", e.target.value)}
+                      disabled={isPosted}
+                      placeholder="Description"
+                    />
+                    <div className="relative">
+                      <Input
+                        className="h-7 text-xs px-1.5"
+                        value={entry.account_code}
+                        onChange={(e) => updateEntry(idx, "account_code", e.target.value)}
+                        disabled={isPosted}
+                        placeholder="Account"
+                        list={`acc-suggestions-${idx}`}
+                        onFocus={() => setSuggestionFor(idx)}
+                        onBlur={() => setSuggestionFor(null)}
+                      />
+                      <datalist id={`acc-suggestions-${idx}`}>
+                        {accountSuggestions.map((s) => (
+                          <option key={s} value={s} />
+                        ))}
+                      </datalist>
+                      {suggestionFor === idx && (
+                        <div className="absolute z-50 bg-white dark:bg-[#1a1a1d] border border-gray-200 dark:border-gray-700 rounded-md shadow-lg mt-1 max-h-36 overflow-y-auto w-48 text-xs hidden" />
+                      )}
+                    </div>
+                    <Input
+                      type="number"
+                      className="h-7 text-xs px-1.5 text-right"
+                      value={entry.debit || ""}
+                      onChange={(e) => updateEntry(idx, "debit", parseFloat(e.target.value) || 0)}
+                      disabled={isPosted}
+                      placeholder="0"
+                    />
+                    <Input
+                      type="number"
+                      className="h-7 text-xs px-1.5 text-right"
+                      value={entry.credit || ""}
+                      onChange={(e) => updateEntry(idx, "credit", parseFloat(e.target.value) || 0)}
+                      disabled={isPosted}
+                      placeholder="0"
+                    />
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20"
+                      onClick={() => removeEntry(idx)}
+                      disabled={isPosted || form.entries.length === 1}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
-                  <Input
-                    type="number"
-                    className="h-7 text-xs px-1.5 text-right"
-                    value={entry.debit || ""}
-                    onChange={(e) => updateEntry(idx, "debit", parseFloat(e.target.value) || 0)}
-                    disabled={isPosted}
-                    placeholder="0"
-                  />
-                  <Input
-                    type="number"
-                    className="h-7 text-xs px-1.5 text-right"
-                    value={entry.credit || ""}
-                    onChange={(e) => updateEntry(idx, "credit", parseFloat(e.target.value) || 0)}
-                    disabled={isPosted}
-                    placeholder="0"
-                  />
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    className="h-7 w-7 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20"
-                    onClick={() => removeEntry(idx)}
-                    disabled={isPosted || form.entries.length === 1}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
 
-            {/* Totals row */}
-            <div
-              className="grid items-center gap-1 px-2 py-2 bg-gray-50 dark:bg-[#111113] border-t border-gray-200 dark:border-gray-800 font-semibold text-sm"
-              style={{ gridTemplateColumns: "48px 80px 90px 100px 1fr 160px 96px 96px 36px" }}
-            >
-              <span className="col-span-6 text-xs text-gray-500 text-right pr-2">Totals:</span>
-              <span className="text-right text-green-700 dark:text-green-400">
-                {totalDebit.toLocaleString("en-PK", { minimumFractionDigits: 2 })}
-              </span>
-              <span className="text-right text-blue-700 dark:text-blue-400">
-                {totalCredit.toLocaleString("en-PK", { minimumFractionDigits: 2 })}
-              </span>
-              <span />
+              {/* Totals row */}
+              <div
+                className="grid items-center gap-1 px-2 py-2 bg-gray-50 dark:bg-[#111113] border-t border-gray-200 dark:border-gray-800 font-semibold text-sm"
+                style={{ gridTemplateColumns: "48px 80px 90px 100px 1fr 160px 96px 96px 36px" }}
+              >
+                <span className="col-span-6 text-xs text-gray-500 text-right pr-2">Totals:</span>
+                <span className="text-right text-green-700 dark:text-green-400">
+                  {totalDebit.toLocaleString("en-PK", { minimumFractionDigits: 2 })}
+                </span>
+                <span className="text-right text-blue-700 dark:text-blue-400">
+                  {totalCredit.toLocaleString("en-PK", { minimumFractionDigits: 2 })}
+                </span>
+                <span />
+              </div>
             </div>
           </div>
         </div>
@@ -908,7 +909,7 @@ export default function VouchersPage() {
 
       {/* ── Create Dialog ── */}
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
-      <DialogContent className="w-[98vw] max-w-[1400px] max-h-[92vh] overflow-y-auto overflow-x-hidden">
+        <DialogContent className="sm:max-w-[96vw] md:max-w-[95vw] lg:max-w-[1300px] xl:max-w-[1400px] w-[96vw] max-h-[96vh] overflow-y-auto overflow-x-hidden p-6">
 
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -933,7 +934,7 @@ export default function VouchersPage() {
 
       {/* â”€â”€ Edit Dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <Dialog open={!!showEdit} onOpenChange={(o) => { if (!o) setShowEdit(null); }}>
-      <DialogContent className="w-[98vw] max-w-[1400px] max-h-[92vh] overflow-y-auto overflow-x-hidden">
+        <DialogContent className="sm:max-w-[96vw] md:max-w-[95vw] lg:max-w-[1300px] xl:max-w-[1400px] w-[96vw] max-h-[96vh] overflow-y-auto overflow-x-hidden p-6">
 
           {showEdit && (
             <>
