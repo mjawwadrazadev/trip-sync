@@ -136,6 +136,7 @@ export default function VouchersPage() {
   const [page, setPage] = useState(1);
 
   // Dialogs
+  const [showTypePicker, setShowTypePicker] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [showEdit, setShowEdit] = useState<Voucher | null>(null);
   const [createType, setCreateType] = useState<VoucherType>("RV");
@@ -694,21 +695,14 @@ export default function VouchersPage() {
             Receipt, Payment, Journal, Debit Note &amp; Cash Deposit vouchers
           </p>
         </div>
-        {/* Quick-create buttons */}
-        <div className="flex flex-wrap gap-2">
-          {VOUCHER_TYPES.map((t) => (
-            <Button
-              key={t.value}
-              size="sm"
-              variant="outline"
-              className="gap-1.5 text-xs font-semibold h-8"
-              onClick={() => openCreate(t.value)}
-            >
-              <Plus className="h-3.5 w-3.5" />
-              {t.value}
-            </Button>
-          ))}
-        </div>
+        {/* Single New Voucher button */}
+        <Button
+          className="gap-2 h-9"
+          onClick={() => setShowTypePicker(true)}
+        >
+          <Plus className="h-4 w-4" />
+          New Voucher
+        </Button>
       </div>
 
       {/* Filters bar */}
@@ -778,7 +772,7 @@ export default function VouchersPage() {
                   <td colSpan={8} className="text-center py-16 text-gray-400">
                     <div className="text-4xl mb-3">ðŸ§¾</div>
                     <p className="text-sm font-medium text-gray-500">No vouchers found</p>
-                    <p className="text-xs text-gray-400 mt-1">Create your first voucher using the buttons above</p>
+                    <p className="text-xs text-gray-400 mt-1">Create your first voucher by clicking New Voucher above</p>
                   </td>
                 </tr>
               ) : (
@@ -875,7 +869,44 @@ export default function VouchersPage() {
         )}
       </div>
 
-      {/* â”€â”€ Create Dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── Type Picker Dialog ─────────────────────────────────────────────── */}
+      <Dialog open={showTypePicker} onOpenChange={setShowTypePicker}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold">Select Voucher Type</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-1 gap-2.5 py-2">
+            {VOUCHER_TYPES.map((t) => (
+              <button
+                key={t.value}
+                type="button"
+                className="flex items-center justify-between p-3 rounded-xl border border-gray-200 dark:border-gray-800 hover:border-primary hover:bg-primary/5 transition-all text-left group"
+                onClick={() => {
+                  setShowTypePicker(false);
+                  openCreate(t.value);
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  <span className={`inline-flex items-center justify-center w-10 h-10 rounded-lg text-xs font-bold ${t.color}`}>
+                    {t.value}
+                  </span>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 group-hover:text-primary transition-colors">
+                      {t.label.split(" - ")[1]}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 font-mono">
+                      {t.value} Voucher
+                    </p>
+                  </div>
+                </div>
+                <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-primary transition-colors" />
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Create Dialog ── */}
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
       <DialogContent className="w-[98vw] max-w-[1400px] max-h-[92vh] overflow-y-auto overflow-x-hidden">
 
