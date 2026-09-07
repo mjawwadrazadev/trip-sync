@@ -1204,7 +1204,7 @@ export default function InvoicesPage() {
               {/* Airline City Tax Table (Liability) */}
               <div className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden bg-white dark:bg-[#111113]">
                 <div className="bg-slate-100 dark:bg-slate-900 px-2 py-1 flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
-                  <span className="font-bold text-[10px] text-slate-700 dark:text-slate-300">Airline City Tax (Liability)</span>
+                  <span className="font-bold text-[10px] text-slate-700 dark:text-slate-300">Airline Tax</span>
                   <button
                     type="button"
                     onClick={() => addAirlineCityTax(itemIdx, isEdit)}
