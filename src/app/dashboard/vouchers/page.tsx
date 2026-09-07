@@ -124,6 +124,18 @@ function blankForm(type: VoucherType = "RV") {
 
 // â”€â”€â”€ Main Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
+const BANK_ACCOUNTS = [
+  { name: "MBL - Meezan Bank Ltd", account: "MBL - 0101-0102030 (Operating)" },
+  { name: "HBL - Habib Bank Ltd", account: "HBL - 2341-998201 (Main Branch)" },
+  { name: "UBL - United Bank Ltd", account: "UBL - 1102-887410 (Corporate)" },
+  { name: "MCB - MCB Bank Ltd", account: "MCB - 5560-120934 (Collection)" },
+  { name: "BAFL - Bank Alfalah", account: "BAFL - 8890-001243 (Operations)" },
+  { name: "SCB - Standard Chartered", account: "SCB - 0122-998765 (Treasury)" },
+  { name: "ABL - Allied Bank Ltd", account: "ABL - 4432-119902 (Clearing)" },
+  { name: "Cash in Hand", account: "Cash in Hand - Main Vault" },
+  { name: "Petty Cash", account: "Petty Cash Account" },
+];
+
 export default function VouchersPage() {
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
   const [total, setTotal] = useState(0);
@@ -146,8 +158,9 @@ export default function VouchersPage() {
   const [saving, setSaving] = useState(false);
   const [posting, setPosting] = useState(false);
 
-  // Account suggestions
+  // Account suggestions & Invoices
   const [accountSuggestions, setAccountSuggestions] = useState<string[]>([]);
+  const [invoicesList, setInvoicesList] = useState<Array<{ invoice_number: string; customer_name: string; total_amount: number; due_amount: number }>>([]);
   const [suggestionFor, setSuggestionFor] = useState<number | null>(null);
 
   const fetchVouchers = useCallback(async () => {
@@ -175,19 +188,28 @@ export default function VouchersPage() {
     fetchVouchers();
   }, [fetchVouchers]);
 
-  // Fetch account code suggestions from customers + suppliers
+  // Fetch account code suggestions from customers + suppliers + invoices
   useEffect(() => {
     async function fetchSuggestions() {
       try {
-        const [cr, sr] = await Promise.all([
+        const [cr, sr, ir] = await Promise.all([
           fetch("/api/customers?limit=200").then((r) => r.json()),
           fetch("/api/suppliers?limit=200").then((r) => r.json()),
+          fetch("/api/invoices?limit=200").then((r) => r.json()),
         ]);
         const names: string[] = [
           ...(cr.customers || []).map((c: { name: string }) => c.name),
           ...(sr.suppliers || []).map((s: { name: string }) => s.name),
         ];
         setAccountSuggestions([...new Set(names)] as string[]);
+
+        const invs = (ir.invoices || []).map((inv: { invoice_number: string; customer_id?: { name?: string } | string; total_amount?: number; due_amount?: number }) => ({
+          invoice_number: inv.invoice_number,
+          customer_name: typeof inv.customer_id === "object" ? inv.customer_id?.name || "" : String(inv.customer_id || ""),
+          total_amount: inv.total_amount || 0,
+          due_amount: inv.due_amount !== undefined ? inv.due_amount : inv.total_amount || 0,
+        }));
+        setInvoicesList(invs);
       } catch {
         // ignore
       }
@@ -195,21 +217,38 @@ export default function VouchersPage() {
     fetchSuggestions();
   }, []);
 
-  // â”€â”€ Derived totals â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
   function calcTotals(entries: VoucherEntry[]) {
     const totalDebit = entries.reduce((s, e) => s + (Number(e.debit) || 0), 0);
     const totalCredit = entries.reduce((s, e) => s + (Number(e.credit) || 0), 0);
     return { totalDebit, totalCredit };
   }
 
-  // â”€â”€ Entry helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
   function updateEntry(idx: number, field: keyof VoucherEntry, value: string | number) {
     setForm((prev) => {
-      const entries = prev.entries.map((e, i) =>
-        i === idx ? { ...e, [field]: value } : e
-      );
+      const entries = prev.entries.map((e, i) => {
+        if (i !== idx) return e;
+        const updated = { ...e, [field]: value };
+        // Auto-populate when Invoice # is typed in ref_no
+        if (field === "ref_no" && typeof value === "string" && value.trim()) {
+          const query = value.trim().toLowerCase();
+          const matchedInv = invoicesList.find(
+            (inv) => inv.invoice_number.toLowerCase() === query || inv.invoice_number.toLowerCase().includes(query)
+          );
+          if (matchedInv) {
+            if (!updated.account_code) updated.account_code = matchedInv.customer_name;
+            if (!updated.description) updated.description = `Invoice ${matchedInv.invoice_number} - ${matchedInv.customer_name}`;
+            const amount = matchedInv.due_amount || matchedInv.total_amount || 0;
+            if (prev.voucher_type === "RV") {
+              updated.credit = amount;
+              updated.debit = 0;
+            } else if (prev.voucher_type === "PV") {
+              updated.debit = amount;
+              updated.credit = 0;
+            }
+          }
+        }
+        return updated;
+      });
       return { ...prev, entries };
     });
   }
@@ -362,14 +401,31 @@ export default function VouchersPage() {
 
     return (
       <div className="space-y-4">
-        {/* Row 1: Type, Date, Name on Voucher, Manual Receipt No */}
+        {/* Datalists for Autocomplete */}
+        <datalist id="account-suggestions">
+          {accountSuggestions.map((s) => (
+            <option key={s} value={s} />
+          ))}
+        </datalist>
+        <datalist id="invoice-suggestions">
+          {invoicesList.map((inv) => (
+            <option key={inv.invoice_number} value={inv.invoice_number}>
+              {`${inv.invoice_number} - ${inv.customer_name} (Due: PKR ${inv.due_amount.toLocaleString()})`}
+            </option>
+          ))}
+        </datalist>
+
+        {/* Row 1: Type (Locked if edit), Date, Name on Voucher, Manual Receipt No */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div>
-            <Label className="text-xs font-medium text-gray-500 mb-1.5 block">Voucher Type</Label>
+            <div className="flex items-center justify-between mb-1.5">
+              <Label className="text-xs font-medium text-gray-500">Voucher Type</Label>
+              {isEdit && <Badge variant="outline" className="text-[10px] py-0">Locked</Badge>}
+            </div>
             <Select
               value={form.voucher_type}
               onValueChange={(v) => setForm((p) => ({ ...p, voucher_type: v as VoucherType }))}
-              disabled={isPosted}
+              disabled={isEdit || isPosted}
             >
               <SelectTrigger className="h-9 text-sm">
                 <SelectValue />
@@ -403,11 +459,6 @@ export default function VouchersPage() {
               disabled={isPosted}
               list="account-suggestions"
             />
-            <datalist id="account-suggestions">
-              {accountSuggestions.map((s) => (
-                <option key={s} value={s} />
-              ))}
-            </datalist>
           </div>
           <div>
             <Label className="text-xs font-medium text-gray-500 mb-1.5 block">Manual Receipt No</Label>
@@ -421,15 +472,49 @@ export default function VouchersPage() {
           </div>
         </div>
 
-        {/* Row 2: Cost Center, Cheque No, Cheque Status, Debit Account */}
+        {/* Row 2: Bank / Source, Debit Account, Debit Amount, Cheque No */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div>
-            <Label className="text-xs font-medium text-gray-500 mb-1.5 block">Cost Center</Label>
+            <Label className="text-xs font-medium text-gray-500 mb-1.5 block">Bank / Source</Label>
+            <Select
+              onValueChange={(v) => {
+                const b = BANK_ACCOUNTS.find((item) => item.name === v);
+                if (b) setForm((p) => ({ ...p, debit_account: b.account }));
+              }}
+              disabled={isPosted}
+            >
+              <SelectTrigger className="h-9 text-sm">
+                <SelectValue placeholder="Select Bank / Cash" />
+              </SelectTrigger>
+              <SelectContent>
+                {BANK_ACCOUNTS.map((b) => (
+                  <SelectItem key={b.name} value={b.name}>{b.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="text-xs font-medium text-gray-500 mb-1.5 block">Debit Account</Label>
             <Input
-              className="h-9 text-sm"
-              placeholder="Cost center"
-              value={form.cost_center}
-              onChange={(e) => setForm((p) => ({ ...p, cost_center: e.target.value }))}
+              className="h-9 text-sm font-medium text-primary"
+              placeholder="Associated account"
+              value={form.debit_account}
+              onChange={(e) => setForm((p) => ({ ...p, debit_account: e.target.value }))}
+              disabled={isPosted}
+              list="account-suggestions"
+            />
+          </div>
+          <div>
+            <Label className="text-xs font-medium text-gray-500 mb-1.5 block">Debit Amount</Label>
+            <Input
+              type="number"
+              className="h-9 text-sm font-mono font-bold"
+              placeholder="0.00"
+              value={form.entries[0]?.debit || (totalDebit > 0 ? totalDebit : "")}
+              onChange={(e) => {
+                const val = parseFloat(e.target.value) || 0;
+                updateEntry(0, "debit", val);
+              }}
               disabled={isPosted}
             />
           </div>
@@ -443,43 +528,13 @@ export default function VouchersPage() {
               disabled={isPosted}
             />
           </div>
-          <div>
-            <Label className="text-xs font-medium text-gray-500 mb-1.5 block">Cheque Status</Label>
-            <Select
-              value={form.cheque_status || "none"}
-              onValueChange={(v) => setForm((p) => ({ ...p, cheque_status: (v ?? "") === "none" ? "" : (v ?? "") }))}
-
-              disabled={isPosted}
-            >
-              <SelectTrigger className="h-9 text-sm">
-                <SelectValue placeholder="Select..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">â€”</SelectItem>
-                {CHEQUE_STATUSES.filter(Boolean).map((s) => (
-                  <SelectItem key={s} value={s}>{s}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label className="text-xs font-medium text-gray-500 mb-1.5 block">Debit Account</Label>
-            <Input
-              className="h-9 text-sm"
-              placeholder="Debit account"
-              value={form.debit_account}
-              onChange={(e) => setForm((p) => ({ ...p, debit_account: e.target.value }))}
-              disabled={isPosted}
-              list="account-suggestions"
-            />
-          </div>
         </div>
 
         {/* Journal Entries Grid */}
         <div>
           <div className="flex items-center justify-between mb-2">
             <Label className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
-              Journal Entries
+              Journal Entries (Auto-fill on Invoice #)
             </Label>
             {!isPosted && (
               <div className="flex gap-2">
@@ -510,10 +565,10 @@ export default function VouchersPage() {
           <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden overflow-x-auto">
             <div className="min-w-[900px]">
               <div className="grid text-[11px] font-semibold uppercase tracking-wide text-gray-500 bg-gray-50 dark:bg-[#111113] px-2 py-1.5"
-                style={{ gridTemplateColumns: "48px 80px 90px 100px 1fr 160px 96px 96px 36px" }}>
+                style={{ gridTemplateColumns: "48px 80px 110px 100px 1fr 160px 96px 96px 36px" }}>
                 <span>Br</span>
                 <span>Ref Code</span>
-                <span>Ref No</span>
+                <span>Ref / Inv #</span>
                 <span>Adj Date</span>
                 <span>Description</span>
                 <span>Account Code</span>
@@ -527,7 +582,7 @@ export default function VouchersPage() {
                   <div
                     key={idx}
                     className="grid items-center gap-1 px-2 py-1 hover:bg-gray-50/50 dark:hover:bg-[#111113]/50"
-                    style={{ gridTemplateColumns: "48px 80px 90px 100px 1fr 160px 96px 96px 36px" }}
+                    style={{ gridTemplateColumns: "48px 80px 110px 100px 1fr 160px 96px 96px 36px" }}
                   >
                     <Input
                       className="h-7 text-xs px-1.5"
@@ -544,11 +599,12 @@ export default function VouchersPage() {
                       placeholder="RC"
                     />
                     <Input
-                      className="h-7 text-xs px-1.5"
+                      className="h-7 text-xs px-1.5 font-mono"
                       value={entry.ref_no}
                       onChange={(e) => updateEntry(idx, "ref_no", e.target.value)}
                       disabled={isPosted}
-                      placeholder="Ref #"
+                      placeholder="Inv # / Ref"
+                      list="invoice-suggestions"
                     />
                     <Input
                       type="date"

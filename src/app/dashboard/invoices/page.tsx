@@ -14,8 +14,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Textarea } from "@/components/ui/textarea";
 import {
   Plus, Send, Ban, CreditCard, Trash2, History, Loader2, Pencil,
-  Printer, Plane, FileText, Calculator, Search, X, RotateCcw, AlertTriangle, Check
+  Printer, Plane, FileText, Calculator, Search, X, RotateCcw, AlertTriangle, Check, Layers
 } from "lucide-react";
+import { CITY_AIRPORT_CODES, formatTicketNumber, getAirlineByTicketNumber } from "@/lib/iataAirlines";
 
 interface Invoice {
   _id: string;
@@ -30,8 +31,9 @@ interface Invoice {
   bsp_flag: boolean;
   payment_mode?: string;
   remarks?: string;
+  internal_remarks?: string;
+  customer_remarks?: string;
   print_name?: string;
-  cost_center?: string;
   created_at: string;
 }
 
@@ -46,7 +48,6 @@ interface FlightSegment {
   dep_date: string;
   dep_time: string;
   arr_time: string;
-  fare_basis: string;
 }
 
 interface DynamicTaxItem {
@@ -61,7 +62,7 @@ interface LineItemInput {
   commission_override_rate: string;
   tax_code_id: string;
   
-  // Passenger & Airline Details (Green-ticked in ERP screenshot)
+  // Passenger & Airline Details
   pax_name?: string;
   pax_type?: string;
   passport_no?: string;
@@ -69,6 +70,12 @@ interface LineItemInput {
   ticket_number?: string;
   conjunction_ticket_no?: string;
   conjunction_route?: string;
+  conjunction_city?: string;
+  conjunction_flight_no?: string;
+  conjunction_booking_class?: string;
+  conjunction_dep_date?: string;
+  conjunction_dep_time?: string;
+  conjunction_arr_time?: string;
   gds_pnr?: string;
   gds_name?: string;
   airline_name?: string;
@@ -79,13 +86,14 @@ interface LineItemInput {
   tour_code?: string;
   issue_date?: string;
   our_xo?: string;
+  customer_remarks?: string;
   flight_segments?: FlightSegment[];
   
-  // Dynamic Taxes (Top of Right Box)
+  // Dynamic Taxes
   airline_city_taxes?: DynamicTaxItem[];
   city_taxes?: DynamicTaxItem[];
 
-  // 14 IATA Standard Airline Taxes
+  // 14 IATA Standard Airline Taxes (International)
   base_fare?: string;
   tax_dof?: string;
   tax_yq?: string;
@@ -103,6 +111,11 @@ interface LineItemInput {
   tax_city?: string;
   tax_airline_city?: string;
   other_taxes?: string;
+
+  // Domestic Taxes
+  tax_ced?: string;
+  tax_gst_dom?: string;
+  tax_ast?: string;
 
   // Commercials & Deductions Matrix
   wht_percent?: string;
@@ -174,16 +187,17 @@ export default function InvoicesPage() {
   const [creditAmount, setCreditAmount] = useState("");
   const [creditReason, setCreditReason] = useState("");
 
-  // Invoice Header State (Green-ticked in ERP screenshot)
+  // Invoice Header State
   const [newCustomerId, setNewCustomerId] = useState("");
   const [newCurrency] = useState("PKR");
   const [newPaymentMode, setNewPaymentMode] = useState("CR");
-  const [newRemarks, setNewRemarks] = useState("NORMAL");
+  const [newRemarks, setNewRemarks] = useState("");
+  const [newInternalRemarks, setNewInternalRemarks] = useState("");
+  const [newCustomerRemarks, setNewCustomerRemarks] = useState("");
   const [newVisitType, setNewVisitType] = useState("Visitor");
   const [newSpoId, setNewSpoId] = useState("");
   const [newSupplierId, setNewSupplierId] = useState("");
   const [newPrintName, setNewPrintName] = useState("");
-  const [newCostCenter, setNewCostCenter] = useState("");
   const [newInvDate, setNewInvDate] = useState(new Date().toISOString().split("T")[0]);
   const [newAdjDate, setNewAdjDate] = useState(new Date().toISOString().split("T")[0]);
   const [newOurXo, setNewOurXo] = useState("E");
@@ -191,10 +205,12 @@ export default function InvoicesPage() {
   const [newDocStatus, setNewDocStatus] = useState("Draft");
   const [newBsp] = useState(false);
   const [newBspBillingPeriod] = useState("");
+  const [activeTicketTab, setActiveTicketTab] = useState(0);
+  const [activeEditTicketTab, setActiveEditTicketTab] = useState(0);
 
   const defaultType = (typeFilter && typeFilter !== "Other") ? typeFilter : "Ticket";
 
-  // Ticket Line item default matching ERP screenshot exactly
+  // Ticket Line item default matching ERP screenshot
   const createDefaultTicketItem = (): LineItemInput => ({
     service_type: "Ticket",
     description: "",
@@ -208,6 +224,12 @@ export default function InvoicesPage() {
     ticket_number: "",
     conjunction_ticket_no: "",
     conjunction_route: "",
+    conjunction_city: "",
+    conjunction_flight_no: "",
+    conjunction_booking_class: "",
+    conjunction_dep_date: "",
+    conjunction_dep_time: "",
+    conjunction_arr_time: "",
     gds_pnr: "",
     gds_name: "Amadeus",
     airline_name: "",
@@ -217,10 +239,11 @@ export default function InvoicesPage() {
     doc_type: "BSPD",
     tour_code: "",
     our_xo: "E",
+    customer_remarks: "",
     issue_date: new Date().toISOString().split("T")[0],
     flight_segments: [
-      { city: "LHE", flight_no: "621", booking_class: "Y", dep_date: "", dep_time: "", arr_time: "", fare_basis: "KLE01PK" },
-      { city: "DOH", flight_no: "621", booking_class: "Y", dep_date: "", dep_time: "", arr_time: "", fare_basis: "KLE01PK" },
+      { city: "LHE", flight_no: "621", booking_class: "Y", dep_date: "", dep_time: "", arr_time: "" },
+      { city: "DOH", flight_no: "621", booking_class: "Y", dep_date: "", dep_time: "", arr_time: "" },
     ],
     airline_city_taxes: [
       { code: "XT", amount: "0" },
@@ -245,6 +268,9 @@ export default function InvoicesPage() {
     tax_city: "0",
     tax_airline_city: "0",
     other_taxes: "0",
+    tax_ced: "0",
+    tax_gst_dom: "0",
+    tax_ast: "0",
     wht_percent: "12",
     wht_amount: "0",
     commission_percent: "0",
@@ -283,12 +309,13 @@ export default function InvoicesPage() {
   const [editCustomerId, setEditCustomerId] = useState("");
   const [editCurrency, setEditCurrency] = useState("PKR");
   const [editPaymentMode, setEditPaymentMode] = useState("CR");
-  const [editRemarks, setEditRemarks] = useState("NORMAL");
+  const [editRemarks, setEditRemarks] = useState("");
+  const [editInternalRemarks, setEditInternalRemarks] = useState("");
+  const [editCustomerRemarks, setEditCustomerRemarks] = useState("");
   const [editVisitType, setEditVisitType] = useState("Visitor");
   const [editSpoId, setEditSpoId] = useState("");
   const [editSupplierId, setEditSupplierId] = useState("");
   const [editPrintName, setEditPrintName] = useState("");
-  const [editCostCenter, setEditCostCenter] = useState("");
   const [editAdjDate, setEditAdjDate] = useState("");
   const [editOurXo, setEditOurXo] = useState("");
   const [editClientXo, setEditClientXo] = useState("");
@@ -390,38 +417,51 @@ export default function InvoicesPage() {
     }
   }
 
-  // Dual-Sided Travel Accounting Calculations (Matching ERP Screenshot Exactly)
+  // Dual-Sided Travel Accounting Calculations (Live auto-calculation)
   function calculateTicketTotals(item: LineItemInput): LineItemInput {
     const baseFare = parseFloat(item.base_fare || "0") || 0;
     
-    // Dynamic Airline City Tax Sum
+    // Dynamic Airline City Tax Sum (Liability)
     const airlineCityTaxSum = (item.airline_city_taxes || []).reduce(
       (sum, t) => sum + (parseFloat(t.amount || "0") || 0), 0
     );
 
-    // Dynamic City Tax Sum
+    // Dynamic City Tax Sum (Income/Service)
     const cityTaxSum = (item.city_taxes || []).reduce(
       (sum, t) => sum + (parseFloat(t.amount || "0") || 0), 0
     );
 
-    const taxes = (parseFloat(item.tax_dof || "0") || 0) +
-      (parseFloat(item.tax_yq || "0") || 0) +
-      (parseFloat(item.tax_yr || "0") || 0) +
-      (parseFloat(item.tax_rg || "0") || 0) +
-      (parseFloat(item.tax_pk || "0") || 0) +
-      (parseFloat(item.tax_apt || "0") || 0) +
-      (parseFloat(item.tax_kbr || "0") || 0) +
-      (parseFloat(item.tax_kbp || "0") || 0) +
-      (parseFloat(item.tax_pb || "0") || 0) +
-      (parseFloat(item.tax_xz || "0") || 0) +
-      (parseFloat(item.tax_yd || "0") || 0) +
-      (parseFloat(item.tax_yi || "0") || 0) +
-      (parseFloat(item.tax_rn || "0") || 0) +
-      (parseFloat(item.tax_city || "0") || 0) +
-      (parseFloat(item.tax_airline_city || "0") || 0) +
-      (parseFloat(item.other_taxes || "0") || 0) +
-      airlineCityTaxSum +
-      cityTaxSum;
+    let taxes = 0;
+    if (item.trip_type === "Domestic") {
+      // Domestic Taxes
+      taxes = (parseFloat(item.tax_ced || "0") || 0) +
+        (parseFloat(item.tax_gst_dom || "0") || 0) +
+        (parseFloat(item.tax_ast || "0") || 0) +
+        (parseFloat(item.tax_apt || "0") || 0) +
+        (parseFloat(item.other_taxes || "0") || 0) +
+        airlineCityTaxSum +
+        cityTaxSum;
+    } else {
+      // International IATA Taxes
+      taxes = (parseFloat(item.tax_dof || "0") || 0) +
+        (parseFloat(item.tax_yq || "0") || 0) +
+        (parseFloat(item.tax_yr || "0") || 0) +
+        (parseFloat(item.tax_rg || "0") || 0) +
+        (parseFloat(item.tax_pk || "0") || 0) +
+        (parseFloat(item.tax_apt || "0") || 0) +
+        (parseFloat(item.tax_kbr || "0") || 0) +
+        (parseFloat(item.tax_kbp || "0") || 0) +
+        (parseFloat(item.tax_pb || "0") || 0) +
+        (parseFloat(item.tax_xz || "0") || 0) +
+        (parseFloat(item.tax_yd || "0") || 0) +
+        (parseFloat(item.tax_yi || "0") || 0) +
+        (parseFloat(item.tax_rn || "0") || 0) +
+        (parseFloat(item.tax_city || "0") || 0) +
+        (parseFloat(item.tax_airline_city || "0") || 0) +
+        (parseFloat(item.other_taxes || "0") || 0) +
+        airlineCityTaxSum +
+        cityTaxSum;
+    }
 
     const grossFare = baseFare + taxes;
     
@@ -475,6 +515,22 @@ export default function InvoicesPage() {
   function updateTicketLineItem(index: number, field: string, value: unknown, isEdit = false) {
     const list = isEdit ? [...editLineItems] : [...lineItems];
     let item = { ...list[index], [field]: value };
+
+    // Auto-format ticket number and auto-detect airline
+    if (field === "ticket_number" && typeof value === "string") {
+      const formatted = formatTicketNumber(value);
+      item.ticket_number = formatted;
+      const detectedAirline = getAirlineByTicketNumber(formatted);
+      if (detectedAirline) {
+        item.airline_name = detectedAirline.name;
+        item.airline_code = detectedAirline.code;
+      }
+    }
+
+    if (field === "conjunction_ticket_no" && typeof value === "string") {
+      item.conjunction_ticket_no = formatTicketNumber(value);
+    }
+
     if (item.auto_update !== false) {
       item = calculateTicketTotals(item);
     }
@@ -483,11 +539,12 @@ export default function InvoicesPage() {
     else setLineItems(list);
   }
 
-  // Flight Segments Helpers
+  // Flight Segments Helpers (Max 5 Legs)
   function addFlightSegment(index: number, isEdit = false) {
     const list = isEdit ? [...editLineItems] : [...lineItems];
     const segs = [...(list[index].flight_segments || [])];
-    segs.push({ city: "", flight_no: "", booking_class: "Y", dep_date: "", dep_time: "", arr_time: "", fare_basis: "" });
+    if (segs.length >= 5) return; // Max 5 legs per ticket
+    segs.push({ city: "", flight_no: "", booking_class: "Y", dep_date: "", dep_time: "", arr_time: "" });
     list[index] = { ...list[index], flight_segments: segs };
     if (isEdit) setEditLineItems(list);
     else setLineItems(list);
@@ -577,12 +634,13 @@ export default function InvoicesPage() {
           bsp_flag: newBsp,
           bsp_billing_period: newBspBillingPeriod || null,
           payment_mode: newPaymentMode,
-          remarks: newRemarks,
+          remarks: newInternalRemarks || newRemarks || "",
+          internal_remarks: newInternalRemarks,
+          customer_remarks: newCustomerRemarks,
           visit_type: newVisitType,
           spo_id: newSpoId || null,
           supplier_id: newSupplierId || null,
           print_name: newPrintName,
-          cost_center: newCostCenter,
           adj_date: newAdjDate,
           our_xo: newOurXo,
           client_xo: newClientXo,
@@ -594,6 +652,7 @@ export default function InvoicesPage() {
         setShowNew(false);
         setNewCustomerId("");
         setLineItems([defaultType === "Ticket" ? createDefaultTicketItem() : { service_type: defaultType, description: "", amount: "", commission_override_rate: "", tax_code_id: "" }]);
+        setActiveTicketTab(0);
         loadInvoices();
       } else {
         const d = await res.json();
@@ -637,12 +696,13 @@ export default function InvoicesPage() {
     setEditCurrency(inv.currency);
     setEditBsp(inv.bsp_flag);
     setEditPaymentMode(data.invoice?.payment_mode || "CR");
-    setEditRemarks(data.invoice?.remarks || "NORMAL");
+    setEditRemarks(data.invoice?.remarks || "");
+    setEditInternalRemarks(data.invoice?.internal_remarks || data.invoice?.remarks || "");
+    setEditCustomerRemarks(data.invoice?.customer_remarks || "");
     setEditVisitType(data.invoice?.visit_type || "Visitor");
     setEditSpoId(data.invoice?.spo_id?._id || data.invoice?.spo_id || "");
     setEditSupplierId(data.invoice?.supplier_id?._id || data.invoice?.supplier_id || "");
     setEditPrintName(data.invoice?.print_name || "");
-    setEditCostCenter(data.invoice?.cost_center || "");
     setEditAdjDate(data.invoice?.adj_date ? new Date(data.invoice.adj_date).toISOString().split("T")[0] : "");
     setEditOurXo(data.invoice?.our_xo || "E");
     setEditClientXo(data.invoice?.client_xo || "");
@@ -661,6 +721,12 @@ export default function InvoicesPage() {
       ticket_number: String(li.ticket_number || ""),
       conjunction_ticket_no: String(li.conjunction_ticket_no || ""),
       conjunction_route: String(li.conjunction_route || ""),
+      conjunction_city: String(li.conjunction_city || ""),
+      conjunction_flight_no: String(li.conjunction_flight_no || ""),
+      conjunction_booking_class: String(li.conjunction_booking_class || "Y"),
+      conjunction_dep_date: String(li.conjunction_dep_date || ""),
+      conjunction_dep_time: String(li.conjunction_dep_time || ""),
+      conjunction_arr_time: String(li.conjunction_arr_time || ""),
       gds_pnr: String(li.gds_pnr || ""),
       gds_name: String(li.gds_name || "Amadeus"),
       airline_name: String(li.airline_name || ""),
@@ -671,6 +737,7 @@ export default function InvoicesPage() {
       tour_code: String(li.tour_code || ""),
       issue_date: String(li.issue_date || ""),
       our_xo: String(li.our_xo || "E"),
+      customer_remarks: String(li.customer_remarks || ""),
       flight_segments: Array.isArray(li.flight_segments) ? (li.flight_segments as FlightSegment[]) : [],
       airline_city_taxes: Array.isArray(li.airline_city_taxes) ? (li.airline_city_taxes as DynamicTaxItem[]) : [{ code: "XT", amount: "0" }],
       city_taxes: Array.isArray(li.city_taxes) ? (li.city_taxes as DynamicTaxItem[]) : [{ code: "City Tax", amount: "0" }],
@@ -691,6 +758,9 @@ export default function InvoicesPage() {
       tax_city: String(li.tax_city || "0"),
       tax_airline_city: String(li.tax_airline_city || "0"),
       other_taxes: String(li.other_taxes || "0"),
+      tax_ced: String(li.tax_ced || "0"),
+      tax_gst_dom: String(li.tax_gst_dom || "0"),
+      tax_ast: String(li.tax_ast || "0"),
       wht_percent: String(li.wht_percent || "12"),
       wht_amount: String(li.wht_amount || "0"),
       commission_percent: String(li.commission_percent || "0"),
@@ -713,6 +783,7 @@ export default function InvoicesPage() {
       agency_margin: Number(li.agency_margin) || 0,
     }));
     setEditLineItems(items.length > 0 ? items : [createDefaultTicketItem()]);
+    setActiveEditTicketTab(0);
     setEditLoading(false);
   }
 
@@ -729,12 +800,13 @@ export default function InvoicesPage() {
           bsp_flag: editBsp,
           bsp_billing_period: editBspBillingPeriod || null,
           payment_mode: editPaymentMode,
-          remarks: editRemarks,
+          remarks: editInternalRemarks || editRemarks || "",
+          internal_remarks: editInternalRemarks,
+          customer_remarks: editCustomerRemarks,
           visit_type: editVisitType,
           spo_id: editSpoId || null,
           supplier_id: editSupplierId || null,
           print_name: editPrintName,
-          cost_center: editCostCenter,
           adj_date: editAdjDate,
           our_xo: editOurXo,
           client_xo: editClientXo,
@@ -766,11 +838,13 @@ export default function InvoicesPage() {
     Unpaid: "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400 border border-rose-300 dark:border-rose-800/60",
   };
 
-  // Render Ticket Booking Form (Exact Clone of User's ERP Window)
+  // Render Ticket Booking Form
   const renderTicketForm = (item: LineItemInput, itemIdx: number, isEdit = false) => {
+    const isDomestic = item.trip_type === "Domestic";
+
     return (
       <div className="space-y-4 text-[12px] bg-slate-50/50 dark:bg-[#0c0c0e] p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-inner">
-        {/* Passenger & Ticket Main Details (Ticked in ERP Screenshot) */}
+        {/* Passenger & Ticket Main Details */}
         <div className="p-3 bg-white dark:bg-[#111113] rounded-lg border border-slate-200 dark:border-slate-800 space-y-3">
           <div className="font-bold text-[11px] uppercase tracking-wider text-slate-700 dark:text-slate-300 border-b pb-1 flex justify-between">
             <span>Passenger &amp; Ticketing Information</span>
@@ -826,7 +900,7 @@ export default function InvoicesPage() {
           {/* Row 2: Ticket No, PNR, GDS, Airline, Supplier/BSP, Sector, Doc, Type */}
           <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2.5">
             <div className="space-y-1">
-              <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Ticket No. *</Label>
+              <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Ticket No. (3-4-3-3) *</Label>
               <Input
                 placeholder="157-2127-850-017"
                 value={item.ticket_number || ""}
@@ -861,7 +935,7 @@ export default function InvoicesPage() {
             <div className="space-y-1">
               <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Airline *</Label>
               <Input
-                placeholder="QATAR / 157"
+                placeholder="Auto-detected or QATAR"
                 value={item.airline_name || ""}
                 onChange={(e) => updateTicketLineItem(itemIdx, "airline_name", e.target.value.toUpperCase(), isEdit)}
                 className="h-8 text-[12px] uppercase bg-white dark:bg-[#161619]"
@@ -929,22 +1003,23 @@ export default function InvoicesPage() {
           </div>
         </div>
 
-        {/* 2-Column Split: Left Green Box vs Right Green Box */}
+        {/* 2-Column Split: Left Box vs Right Box */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
           
-          {/* LEFT GREEN BOX (Routing & Segments Table + Conjunction Ticket) */}
+          {/* LEFT BOX (Routing & Segments Table + Conjunction Ticket) */}
           <div className="lg:col-span-6 space-y-3.5 flex flex-col justify-between">
-            {/* Flight Segments Table */}
+            {/* Flight Segments Table (Max 5 Legs) */}
             <div className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden bg-white dark:bg-[#111113]">
               <div className="bg-slate-100 dark:bg-slate-900 px-3 py-1.5 flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
                 <span className="font-bold text-[11px] text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                  <Plane className="h-3.5 w-3.5 text-blue-600" /> Flight Routing &amp; Segments
+                  <Plane className="h-3.5 w-3.5 text-blue-600" /> Flight Routing &amp; Segments ({item.flight_segments?.length || 0}/5 Legs)
                 </span>
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
-                  className="h-6 text-[10px] px-2 gap-1 bg-white dark:bg-slate-800"
+                  disabled={(item.flight_segments || []).length >= 5}
+                  className="h-6 text-[10px] px-2 gap-1 bg-white dark:bg-slate-800 disabled:opacity-50"
                   onClick={() => addFlightSegment(itemIdx, isEdit)}
                 >
                   <Plus className="h-2.5 w-2.5" /> Add Leg
@@ -954,13 +1029,12 @@ export default function InvoicesPage() {
                 <table className="w-full text-[11px] table-auto">
                   <thead className="bg-slate-50 dark:bg-[#161618] border-b border-slate-200 dark:border-slate-800 text-slate-500 font-semibold">
                     <tr>
-                      <th className="p-1.5 text-left w-20">City</th>
+                      <th className="p-1.5 text-left w-24">City</th>
                       <th className="p-1.5 text-left w-16">Fl.No</th>
                       <th className="p-1.5 text-left w-12">Cl</th>
                       <th className="p-1.5 text-left w-28">Dep. Date</th>
                       <th className="p-1.5 text-left w-20">Dep. Time</th>
                       <th className="p-1.5 text-left w-20">Arr. Time</th>
-                      <th className="p-1.5 text-left">Fare Basis</th>
                       <th className="p-1.5 text-center w-6"></th>
                     </tr>
                   </thead>
@@ -969,8 +1043,9 @@ export default function InvoicesPage() {
                       <tr key={segIdx} className="border-b border-slate-100 dark:border-slate-800/60">
                         <td className="p-1">
                           <Input
-                            placeholder="LHE"
+                            placeholder="ISB/DXB"
                             value={seg.city}
+                            list="city-airport-options"
                             onChange={(e) => updateFlightSegment(itemIdx, segIdx, "city", e.target.value.toUpperCase(), isEdit)}
                             className="h-7 text-[11px] uppercase font-mono w-full bg-transparent"
                           />
@@ -1015,14 +1090,6 @@ export default function InvoicesPage() {
                             className="h-7 text-[11px] font-mono w-full bg-transparent"
                           />
                         </td>
-                        <td className="p-1">
-                          <Input
-                            placeholder="KLE01PK"
-                            value={seg.fare_basis}
-                            onChange={(e) => updateFlightSegment(itemIdx, segIdx, "fare_basis", e.target.value.toUpperCase(), isEdit)}
-                            className="h-7 text-[11px] font-mono uppercase w-full bg-transparent"
-                          />
-                        </td>
                         <td className="p-1 text-center">
                           {(item.flight_segments || []).length > 1 && (
                             <button
@@ -1041,15 +1108,15 @@ export default function InvoicesPage() {
               </div>
             </div>
 
-            {/* Conjunction Ticket Box (Directly below Flight Segments in ERP) */}
-            <div className="p-3 bg-white dark:bg-[#111113] rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
+            {/* Conjunction Ticket Box (6th Leg / Extended Routing with full leg fields) */}
+            <div className="p-3 bg-white dark:bg-[#111113] rounded-lg border border-slate-200 dark:border-slate-800 space-y-2.5">
               <div className="font-bold text-[11px] text-blue-600 dark:text-blue-400 border-b pb-1 flex justify-between">
-                <span>Conjunction Ticket</span>
-                <span className="text-[10px] text-slate-400 font-normal">Secondary ticket for extended sectors</span>
+                <span>Conjunction Ticket (6th Leg / Extended Routing)</span>
+                <span className="text-[10px] text-slate-400 font-normal">Full secondary leg data</span>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-[10px] text-slate-500 font-semibold">Ticket No.</Label>
+                  <Label className="text-[10px] text-slate-500 font-semibold">Conjunction Ticket No. (3-4-3-3)</Label>
                   <Input
                     placeholder="157-2127-850-018"
                     value={item.conjunction_ticket_no || ""}
@@ -1060,25 +1127,84 @@ export default function InvoicesPage() {
                 <div className="space-y-1">
                   <Label className="text-[10px] text-slate-500 font-semibold">Route Details</Label>
                   <Input
-                    placeholder="LHE"
+                    placeholder="LHE-DOH-LHR"
                     value={item.conjunction_route || ""}
                     onChange={(e) => updateTicketLineItem(itemIdx, "conjunction_route", e.target.value.toUpperCase(), isEdit)}
                     className="h-7 text-[11px] font-mono uppercase bg-white dark:bg-[#161619]"
                   />
                 </div>
               </div>
+
+              {/* Conjunction Leg Details (All Fields) */}
+              <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 pt-1 border-t border-slate-100 dark:border-slate-800">
+                <div className="space-y-1">
+                  <Label className="text-[9px] text-slate-500">6th City</Label>
+                  <Input
+                    placeholder="LHR"
+                    list="city-airport-options"
+                    value={item.conjunction_city || ""}
+                    onChange={(e) => updateTicketLineItem(itemIdx, "conjunction_city", e.target.value.toUpperCase(), isEdit)}
+                    className="h-6 text-[10px] uppercase font-mono"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[9px] text-slate-500">Fl.No</Label>
+                  <Input
+                    placeholder="007"
+                    value={item.conjunction_flight_no || ""}
+                    onChange={(e) => updateTicketLineItem(itemIdx, "conjunction_flight_no", e.target.value, isEdit)}
+                    className="h-6 text-[10px]"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[9px] text-slate-500">Cl</Label>
+                  <Input
+                    placeholder="Y"
+                    value={item.conjunction_booking_class || ""}
+                    onChange={(e) => updateTicketLineItem(itemIdx, "conjunction_booking_class", e.target.value.toUpperCase(), isEdit)}
+                    className="h-6 text-[10px] font-mono uppercase text-center"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[9px] text-slate-500">Dep. Date</Label>
+                  <Input
+                    type="date"
+                    value={item.conjunction_dep_date || ""}
+                    onChange={(e) => updateTicketLineItem(itemIdx, "conjunction_dep_date", e.target.value, isEdit)}
+                    className="h-6 text-[10px]"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[9px] text-slate-500">Dep. Time</Label>
+                  <Input
+                    placeholder="10:00"
+                    value={item.conjunction_dep_time || ""}
+                    onChange={(e) => updateTicketLineItem(itemIdx, "conjunction_dep_time", e.target.value, isEdit)}
+                    className="h-6 text-[10px] font-mono"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[9px] text-slate-500">Arr. Time</Label>
+                  <Input
+                    placeholder="14:30"
+                    value={item.conjunction_arr_time || ""}
+                    onChange={(e) => updateTicketLineItem(itemIdx, "conjunction_arr_time", e.target.value, isEdit)}
+                    className="h-6 text-[10px] font-mono"
+                  />
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* RIGHT GREEN BOX (Airline City Tax, IATA Taxes, Commercials, Cancellation, Totals) */}
+          {/* RIGHT BOX (Airline City Tax, IATA / Domestic Taxes, Commercials, Totals) */}
           <div className="lg:col-span-6 space-y-3">
             
             {/* Top: Airline City Tax & City Tax Side-by-Side */}
             <div className="grid grid-cols-2 gap-3">
-              {/* Airline City Tax Table */}
+              {/* Airline City Tax Table (Liability) */}
               <div className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden bg-white dark:bg-[#111113]">
                 <div className="bg-slate-100 dark:bg-slate-900 px-2 py-1 flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
-                  <span className="font-bold text-[10px] text-slate-700 dark:text-slate-300">Airline City Tax</span>
+                  <span className="font-bold text-[10px] text-slate-700 dark:text-slate-300">Airline City Tax (Liability)</span>
                   <button
                     type="button"
                     onClick={() => addAirlineCityTax(itemIdx, isEdit)}
@@ -1113,10 +1239,10 @@ export default function InvoicesPage() {
                 </div>
               </div>
 
-              {/* City Tax Table */}
+              {/* City Tax Table (Income / Fee) */}
               <div className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden bg-white dark:bg-[#111113]">
                 <div className="bg-slate-100 dark:bg-slate-900 px-2 py-1 flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
-                  <span className="font-bold text-[10px] text-slate-700 dark:text-slate-300">City Tax</span>
+                  <span className="font-bold text-[10px] text-slate-700 dark:text-slate-300">City Tax (Income)</span>
                   <button
                     type="button"
                     onClick={() => addCityTax(itemIdx, isEdit)}
@@ -1152,143 +1278,213 @@ export default function InvoicesPage() {
               </div>
             </div>
 
-            {/* Middle: 14 IATA Standard Airline Taxes 4x4 Grid */}
+            {/* Middle: International Taxes OR Domestic Taxes based on Type Selection */}
             <div className="p-2.5 bg-white dark:bg-[#111113] rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
-              <div className="grid grid-cols-4 gap-1.5 text-[10px]">
-                {/* Row 1: Fare & RN */}
-                <div className="col-span-2">
-                  <span className="text-[9px] text-slate-500 font-bold block uppercase">Fare (Base Fare) *</span>
-                  <Input
-                    type="number"
-                    value={item.base_fare || ""}
-                    onChange={(e) => updateTicketLineItem(itemIdx, "base_fare", e.target.value, isEdit)}
-                    className="h-6 text-[11px] font-mono font-bold text-primary"
-                  />
-                </div>
-                <div className="col-span-2">
-                  <span className="text-[9px] text-slate-500 font-semibold block">RN</span>
-                  <Input
-                    type="number"
-                    value={item.tax_rn || ""}
-                    onChange={(e) => updateTicketLineItem(itemIdx, "tax_rn", e.target.value, isEdit)}
-                    className="h-6 text-[10px] font-mono"
-                  />
-                </div>
-
-                {/* Row 2: DOF, APT, RG, PK */}
-                <div>
-                  <span className="text-[9px] text-slate-500 font-semibold block">DOF</span>
-                  <Input
-                    type="number"
-                    value={item.tax_dof || ""}
-                    onChange={(e) => updateTicketLineItem(itemIdx, "tax_dof", e.target.value, isEdit)}
-                    className="h-6 text-[10px] font-mono"
-                  />
-                </div>
-                <div>
-                  <span className="text-[9px] text-slate-500 font-semibold block">APT</span>
-                  <Input
-                    type="number"
-                    value={item.tax_apt || ""}
-                    onChange={(e) => updateTicketLineItem(itemIdx, "tax_apt", e.target.value, isEdit)}
-                    className="h-6 text-[10px] font-mono"
-                  />
-                </div>
-                <div>
-                  <span className="text-[9px] text-slate-500 font-semibold block">RG</span>
-                  <Input
-                    type="number"
-                    value={item.tax_rg || ""}
-                    onChange={(e) => updateTicketLineItem(itemIdx, "tax_rg", e.target.value, isEdit)}
-                    className="h-6 text-[10px] font-mono"
-                  />
-                </div>
-                <div>
-                  <span className="text-[9px] text-slate-500 font-semibold block">PK</span>
-                  <Input
-                    type="number"
-                    value={item.tax_pk || ""}
-                    onChange={(e) => updateTicketLineItem(itemIdx, "tax_pk", e.target.value, isEdit)}
-                    className="h-6 text-[10px] font-mono"
-                  />
-                </div>
-
-                {/* Row 3: YR, KBR, KBP, PB */}
-                <div>
-                  <span className="text-[9px] text-slate-500 font-semibold block">YR</span>
-                  <Input
-                    type="number"
-                    value={item.tax_yr || ""}
-                    onChange={(e) => updateTicketLineItem(itemIdx, "tax_yr", e.target.value, isEdit)}
-                    className="h-6 text-[10px] font-mono"
-                  />
-                </div>
-                <div>
-                  <span className="text-[9px] text-slate-500 font-semibold block">KBR</span>
-                  <Input
-                    type="number"
-                    value={item.tax_kbr || ""}
-                    onChange={(e) => updateTicketLineItem(itemIdx, "tax_kbr", e.target.value, isEdit)}
-                    className="h-6 text-[10px] font-mono"
-                  />
-                </div>
-                <div>
-                  <span className="text-[9px] text-slate-500 font-semibold block">KBP</span>
-                  <Input
-                    type="number"
-                    value={item.tax_kbp || ""}
-                    onChange={(e) => updateTicketLineItem(itemIdx, "tax_kbp", e.target.value, isEdit)}
-                    className="h-6 text-[10px] font-mono"
-                  />
-                </div>
-                <div>
-                  <span className="text-[9px] text-slate-500 font-semibold block">PB</span>
-                  <Input
-                    type="number"
-                    value={item.tax_pb || ""}
-                    onChange={(e) => updateTicketLineItem(itemIdx, "tax_pb", e.target.value, isEdit)}
-                    className="h-6 text-[10px] font-mono"
-                  />
-                </div>
-
-                {/* Row 4: YQ, XZ, YD, YI */}
-                <div>
-                  <span className="text-[9px] text-slate-500 font-semibold block">YQ</span>
-                  <Input
-                    type="number"
-                    value={item.tax_yq || ""}
-                    onChange={(e) => updateTicketLineItem(itemIdx, "tax_yq", e.target.value, isEdit)}
-                    className="h-6 text-[10px] font-mono"
-                  />
-                </div>
-                <div>
-                  <span className="text-[9px] text-slate-500 font-semibold block">XZ</span>
-                  <Input
-                    type="number"
-                    value={item.tax_xz || ""}
-                    onChange={(e) => updateTicketLineItem(itemIdx, "tax_xz", e.target.value, isEdit)}
-                    className="h-6 text-[10px] font-mono"
-                  />
-                </div>
-                <div>
-                  <span className="text-[9px] text-slate-500 font-semibold block">YD</span>
-                  <Input
-                    type="number"
-                    value={item.tax_yd || ""}
-                    onChange={(e) => updateTicketLineItem(itemIdx, "tax_yd", e.target.value, isEdit)}
-                    className="h-6 text-[10px] font-mono"
-                  />
-                </div>
-                <div>
-                  <span className="text-[9px] text-slate-500 font-semibold block">YI</span>
-                  <Input
-                    type="number"
-                    value={item.tax_yi || ""}
-                    onChange={(e) => updateTicketLineItem(itemIdx, "tax_yi", e.target.value, isEdit)}
-                    className="h-6 text-[10px] font-mono"
-                  />
-                </div>
+              <div className="flex justify-between items-center pb-1 border-b border-slate-100 dark:border-slate-800">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                  {isDomestic ? "Domestic Tax Matrix" : "14 IATA Standard Airline Taxes"}
+                </span>
+                <Badge variant="outline" className="text-[9px] font-mono">
+                  {isDomestic ? "DOMESTIC" : "INTERNATIONAL"}
+                </Badge>
               </div>
+
+              {isDomestic ? (
+                /* Domestic Tax Grid */
+                <div className="grid grid-cols-3 gap-2 text-[10px]">
+                  <div>
+                    <span className="text-[9px] text-slate-500 font-bold block uppercase">Base Fare *</span>
+                    <Input
+                      type="number"
+                      value={item.base_fare || ""}
+                      onChange={(e) => updateTicketLineItem(itemIdx, "base_fare", e.target.value, isEdit)}
+                      className="h-7 text-[11px] font-mono font-bold text-primary"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-slate-500 font-semibold block">CED</span>
+                    <Input
+                      type="number"
+                      value={item.tax_ced || ""}
+                      onChange={(e) => updateTicketLineItem(itemIdx, "tax_ced", e.target.value, isEdit)}
+                      className="h-7 text-[10px] font-mono"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-slate-500 font-semibold block">GST (Dom)</span>
+                    <Input
+                      type="number"
+                      value={item.tax_gst_dom || ""}
+                      onChange={(e) => updateTicketLineItem(itemIdx, "tax_gst_dom", e.target.value, isEdit)}
+                      className="h-7 text-[10px] font-mono"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-slate-500 font-semibold block">AST / Provincial</span>
+                    <Input
+                      type="number"
+                      value={item.tax_ast || ""}
+                      onChange={(e) => updateTicketLineItem(itemIdx, "tax_ast", e.target.value, isEdit)}
+                      className="h-7 text-[10px] font-mono"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-slate-500 font-semibold block">APT (Airport Fee)</span>
+                    <Input
+                      type="number"
+                      value={item.tax_apt || ""}
+                      onChange={(e) => updateTicketLineItem(itemIdx, "tax_apt", e.target.value, isEdit)}
+                      className="h-7 text-[10px] font-mono"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-slate-500 font-semibold block">Other Taxes</span>
+                    <Input
+                      type="number"
+                      value={item.other_taxes || ""}
+                      onChange={(e) => updateTicketLineItem(itemIdx, "other_taxes", e.target.value, isEdit)}
+                      className="h-7 text-[10px] font-mono"
+                    />
+                  </div>
+                </div>
+              ) : (
+                /* International IATA 4x4 Tax Grid */
+                <div className="grid grid-cols-4 gap-1.5 text-[10px]">
+                  {/* Row 1: Fare & RN */}
+                  <div className="col-span-2">
+                    <span className="text-[9px] text-slate-500 font-bold block uppercase">Fare (Base Fare) *</span>
+                    <Input
+                      type="number"
+                      value={item.base_fare || ""}
+                      onChange={(e) => updateTicketLineItem(itemIdx, "base_fare", e.target.value, isEdit)}
+                      className="h-6 text-[11px] font-mono font-bold text-primary"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-[9px] text-slate-500 font-semibold block">RN</span>
+                    <Input
+                      type="number"
+                      value={item.tax_rn || ""}
+                      onChange={(e) => updateTicketLineItem(itemIdx, "tax_rn", e.target.value, isEdit)}
+                      className="h-6 text-[10px] font-mono"
+                    />
+                  </div>
+
+                  {/* Row 2: DOF, APT, RG, PK */}
+                  <div>
+                    <span className="text-[9px] text-slate-500 font-semibold block">DOF</span>
+                    <Input
+                      type="number"
+                      value={item.tax_dof || ""}
+                      onChange={(e) => updateTicketLineItem(itemIdx, "tax_dof", e.target.value, isEdit)}
+                      className="h-6 text-[10px] font-mono"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-slate-500 font-semibold block">APT</span>
+                    <Input
+                      type="number"
+                      value={item.tax_apt || ""}
+                      onChange={(e) => updateTicketLineItem(itemIdx, "tax_apt", e.target.value, isEdit)}
+                      className="h-6 text-[10px] font-mono"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-slate-500 font-semibold block">RG</span>
+                    <Input
+                      type="number"
+                      value={item.tax_rg || ""}
+                      onChange={(e) => updateTicketLineItem(itemIdx, "tax_rg", e.target.value, isEdit)}
+                      className="h-6 text-[10px] font-mono"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-slate-500 font-semibold block">PK</span>
+                    <Input
+                      type="number"
+                      value={item.tax_pk || ""}
+                      onChange={(e) => updateTicketLineItem(itemIdx, "tax_pk", e.target.value, isEdit)}
+                      className="h-6 text-[10px] font-mono"
+                    />
+                  </div>
+
+                  {/* Row 3: YR, KBR, KBP, PB */}
+                  <div>
+                    <span className="text-[9px] text-slate-500 font-semibold block">YR</span>
+                    <Input
+                      type="number"
+                      value={item.tax_yr || ""}
+                      onChange={(e) => updateTicketLineItem(itemIdx, "tax_yr", e.target.value, isEdit)}
+                      className="h-6 text-[10px] font-mono"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-slate-500 font-semibold block">KBR</span>
+                    <Input
+                      type="number"
+                      value={item.tax_kbr || ""}
+                      onChange={(e) => updateTicketLineItem(itemIdx, "tax_kbr", e.target.value, isEdit)}
+                      className="h-6 text-[10px] font-mono"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-slate-500 font-semibold block">KBP</span>
+                    <Input
+                      type="number"
+                      value={item.tax_kbp || ""}
+                      onChange={(e) => updateTicketLineItem(itemIdx, "tax_kbp", e.target.value, isEdit)}
+                      className="h-6 text-[10px] font-mono"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-slate-500 font-semibold block">PB</span>
+                    <Input
+                      type="number"
+                      value={item.tax_pb || ""}
+                      onChange={(e) => updateTicketLineItem(itemIdx, "tax_pb", e.target.value, isEdit)}
+                      className="h-6 text-[10px] font-mono"
+                    />
+                  </div>
+
+                  {/* Row 4: YQ, XZ, YD, YI */}
+                  <div>
+                    <span className="text-[9px] text-slate-500 font-semibold block">YQ</span>
+                    <Input
+                      type="number"
+                      value={item.tax_yq || ""}
+                      onChange={(e) => updateTicketLineItem(itemIdx, "tax_yq", e.target.value, isEdit)}
+                      className="h-6 text-[10px] font-mono"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-slate-500 font-semibold block">XZ</span>
+                    <Input
+                      type="number"
+                      value={item.tax_xz || ""}
+                      onChange={(e) => updateTicketLineItem(itemIdx, "tax_xz", e.target.value, isEdit)}
+                      className="h-6 text-[10px] font-mono"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-slate-500 font-semibold block">YD</span>
+                    <Input
+                      type="number"
+                      value={item.tax_yd || ""}
+                      onChange={(e) => updateTicketLineItem(itemIdx, "tax_yd", e.target.value, isEdit)}
+                      className="h-6 text-[10px] font-mono"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-slate-500 font-semibold block">YI</span>
+                    <Input
+                      type="number"
+                      value={item.tax_yi || ""}
+                      onChange={(e) => updateTicketLineItem(itemIdx, "tax_yi", e.target.value, isEdit)}
+                      className="h-6 text-[10px] font-mono"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Commercials, WHT & Deductions Matrix */}
@@ -1388,26 +1584,17 @@ export default function InvoicesPage() {
                 </div>
               </div>
 
-              {/* Auto Update Checkbox & Auto-Calc Trigger */}
-              <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800 text-[10px]">
-                <label className="flex items-center gap-1.5 cursor-pointer text-slate-600 dark:text-slate-400">
-                  <input
-                    type="checkbox"
-                    checked={item.auto_update !== false}
-                    onChange={(e) => updateTicketLineItem(itemIdx, "auto_update", e.target.checked, isEdit)}
-                    className="rounded border-gray-300 text-primary focus:ring-primary h-3 w-3"
-                  />
-                  <span>Auto Update</span>
-                </label>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  className="h-6 text-[10px] px-2 gap-1"
-                  onClick={() => updateTicketLineItem(itemIdx, "base_fare", item.base_fare, isEdit)}
-                >
-                  <Calculator className="h-3 w-3" /> Recalculate
-                </Button>
+              {/* Customer Remarks input */}
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1">
+                <Label className="text-[10px] font-semibold text-slate-600 dark:text-slate-400">
+                  Customer Remarks (Appears on Customer Invoice)
+                </Label>
+                <Input
+                  placeholder="e.g. Non-refundable after departure / Baggage 30kg / Passenger note"
+                  value={item.customer_remarks || ""}
+                  onChange={(e) => updateTicketLineItem(itemIdx, "customer_remarks", e.target.value, isEdit)}
+                  className="h-7 text-[11px] bg-white dark:bg-[#161619]"
+                />
               </div>
             </div>
 
@@ -1436,7 +1623,7 @@ export default function InvoicesPage() {
               </div>
             </div>
 
-            {/* Totals Summary (Matching ERP Screenshot Exactly) */}
+            {/* Totals Summary */}
             <div className="p-3 bg-slate-900 text-white rounded-lg font-mono text-[11px] space-y-1 shadow">
               <div className="grid grid-cols-2 gap-x-4 border-b border-slate-800 pb-1.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
                 <span>Receivables &amp; Gross</span>
@@ -1511,6 +1698,15 @@ export default function InvoicesPage() {
 
   return (
     <div>
+      {/* City & Airport Autocomplete Datalist */}
+      <datalist id="city-airport-options">
+        {CITY_AIRPORT_CODES.map((c) => (
+          <option key={c.code} value={c.code}>
+            {`${c.code} - ${c.name} (${c.country})`}
+          </option>
+        ))}
+      </datalist>
+
       {/* Page Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -1589,15 +1785,11 @@ export default function InvoicesPage() {
                   </div>
                 </div>
 
-                {/* Header Row 2: Adj. Date, Cost Center, SPO, Visit Type, Remarks */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5">
+                {/* Header Row 2: Adj. Date, SPO, Visit Type, Internal Remarks */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                   <div className="space-y-1">
                     <Label className="text-[11px] font-semibold">Adj. Date</Label>
                     <Input type="date" value={newAdjDate} onChange={(e) => setNewAdjDate(e.target.value)} className="h-8 text-[12px] bg-white dark:bg-[#161619]" />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[11px] font-semibold">Cost Center</Label>
-                    <Input value={newCostCenter} onChange={(e) => setNewCostCenter(e.target.value)} placeholder="Search" className="h-8 text-[12px] bg-white dark:bg-[#161619]" />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-[11px] font-semibold">SPO / Agent</Label>
@@ -1623,54 +1815,114 @@ export default function InvoicesPage() {
                     </Select>
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-[11px] font-semibold">Remarks</Label>
-                    <Select value={newRemarks} onValueChange={(v) => setNewRemarks(v || "NORMAL")}>
-                      <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="NORMAL">NORMAL</SelectItem>
-                        <SelectItem value="REISSUE">REISSUE</SelectItem>
-                        <SelectItem value="REFUND">REFUND</SelectItem>
-                        <SelectItem value="DATE CHANGE">DATE CHANGE</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Label className="text-[11px] font-semibold">Internal Remarks (Staff / Agency)</Label>
+                    <Input
+                      placeholder="Internal agency notes..."
+                      value={newInternalRemarks}
+                      onChange={(e) => setNewInternalRemarks(e.target.value)}
+                      className="h-8 text-[12px] bg-white dark:bg-[#161619]"
+                    />
                   </div>
                 </div>
               </div>
 
-              {/* Service Line Items */}
-              {lineItems.map((li, idx) => (
-                <div key={idx}>
-                  {li.service_type === "Ticket" ? (
-                    renderTicketForm(li, idx, false)
-                  ) : (
-                    <div className="p-4 rounded-xl border border-gray-200 dark:border-gray-800 space-y-3 bg-gray-50/50">
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="Description"
-                          value={li.description}
-                          onChange={(e) => {
-                            const arr = [...lineItems];
-                            arr[idx].description = e.target.value;
-                            setLineItems(arr);
-                          }}
-                          className="flex-1 h-9 text-[13px]"
-                        />
-                        <Input
-                          placeholder="Amount"
-                          type="number"
-                          value={li.amount}
-                          onChange={(e) => {
-                            const arr = [...lineItems];
-                            arr[idx].amount = e.target.value;
-                            setLineItems(arr);
-                          }}
-                          className="w-32 h-9 text-[13px] font-mono"
-                        />
+              {/* Multi-Ticket Tabs & Form */}
+              {lineItems[0]?.service_type === "Ticket" ? (
+                <div className="space-y-3">
+                  {/* Tabs Bar */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 border-b border-slate-200 dark:border-slate-800">
+                    {lineItems.map((li, idx) => (
+                      <div key={idx} className="flex items-center">
+                        <button
+                          type="button"
+                          onClick={() => setActiveTicketTab(idx)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+                            activeTicketTab === idx
+                              ? "bg-primary text-primary-foreground shadow-sm"
+                              : "bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300"
+                          }`}
+                        >
+                          <Plane className="h-3.5 w-3.5" />
+                          <span>{li.pax_name ? li.pax_name.slice(0, 18) : `Ticket ${idx + 1}`}</span>
+                        </button>
+                        {lineItems.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = lineItems.filter((_, i) => i !== idx);
+                              setLineItems(updated);
+                              if (activeTicketTab >= updated.length) setActiveTicketTab(Math.max(0, updated.length - 1));
+                            }}
+                            className="p-1 text-slate-400 hover:text-red-500 ml-0.5"
+                            title="Remove this ticket"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs px-2.5 gap-1 border-dashed"
+                      onClick={() => {
+                        const newTicket = createDefaultTicketItem();
+                        setLineItems((prev) => [...prev, newTicket]);
+                        setActiveTicketTab(lineItems.length);
+                      }}
+                    >
+                      <Plus className="h-3 w-3" /> Add Ticket
+                    </Button>
+                  </div>
+
+                  {/* Active Ticket Form */}
+                  {renderTicketForm(lineItems[activeTicketTab] || lineItems[0], activeTicketTab, false)}
+
+                  {/* Multi-Ticket Grand Total Summary */}
+                  {lineItems.length > 1 && (
+                    <div className="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/60 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs font-semibold">
+                      <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                        <Layers className="h-4 w-4" />
+                        <span>Combined Invoice: <strong>{lineItems.length} Passenger Tickets</strong></span>
+                      </div>
+                      <div className="flex items-center gap-4 font-mono">
+                        <span>Grand Total Due: <strong className="text-primary text-sm">PKR {lineItems.reduce((sum, item) => sum + (item.customer_net || 0), 0).toLocaleString()}</strong></span>
+                        <span>Total Agency Margin: <strong className="text-blue-600 dark:text-blue-400">PKR {lineItems.reduce((sum, item) => sum + (item.agency_margin || 0), 0).toLocaleString()}</strong></span>
                       </div>
                     </div>
                   )}
                 </div>
-              ))}
+              ) : (
+                /* Non-ticket Line Items */
+                lineItems.map((li, idx) => (
+                  <div key={idx} className="p-4 rounded-xl border border-gray-200 dark:border-gray-800 space-y-3 bg-gray-50/50">
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Description"
+                        value={li.description}
+                        onChange={(e) => {
+                          const arr = [...lineItems];
+                          arr[idx].description = e.target.value;
+                          setLineItems(arr);
+                        }}
+                        className="flex-1 h-9 text-[13px]"
+                      />
+                      <Input
+                        placeholder="Amount"
+                        type="number"
+                        value={li.amount}
+                        onChange={(e) => {
+                          const arr = [...lineItems];
+                          arr[idx].amount = e.target.value;
+                          setLineItems(arr);
+                        }}
+                        className="w-32 h-9 text-[13px] font-mono"
+                      />
+                    </div>
+                  </div>
+                ))
+              )}
 
               <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
                 <Button variant="outline" onClick={() => setShowNew(false)}>Cancel</Button>
@@ -2022,10 +2274,6 @@ export default function InvoicesPage() {
                     <Input type="date" value={editAdjDate} onChange={(e) => setEditAdjDate(e.target.value)} className="h-8 text-[12px] bg-white dark:bg-[#161619]" />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-[11px] font-semibold">Cost Center</Label>
-                    <Input value={editCostCenter} onChange={(e) => setEditCostCenter(e.target.value)} placeholder="Cost Center" className="h-8 text-[12px] bg-white dark:bg-[#161619]" />
-                  </div>
-                  <div className="space-y-1">
                     <Label className="text-[11px] font-semibold">SPO / Agent</Label>
                     <Select value={editSpoId} onValueChange={(v) => setEditSpoId(v || "")}>
                       <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]">
@@ -2037,38 +2285,113 @@ export default function InvoicesPage() {
                     </Select>
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-[11px] font-semibold">Remarks</Label>
-                    <Select value={editRemarks} onValueChange={(v) => setEditRemarks(v || "NORMAL")}>
+                    <Label className="text-[11px] font-semibold">Visit Type *</Label>
+                    <Select value={editVisitType} onValueChange={(v) => setEditVisitType(v || "Visitor")}>
                       <SelectTrigger className="h-8 text-[12px] bg-white dark:bg-[#161619]"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="NORMAL">NORMAL</SelectItem>
-                        <SelectItem value="REISSUE">REISSUE</SelectItem>
-                        <SelectItem value="REFUND">REFUND</SelectItem>
-                        <SelectItem value="DATE CHANGE">DATE CHANGE</SelectItem>
+                        <SelectItem value="Visitor">Visitor</SelectItem>
+                        <SelectItem value="Corporate">Corporate</SelectItem>
+                        <SelectItem value="Government">Government</SelectItem>
+                        <SelectItem value="Walk-in">Walk-in</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-semibold">Internal Remarks (Staff / Agency)</Label>
+                    <Input
+                      placeholder="Internal agency notes..."
+                      value={editInternalRemarks}
+                      onChange={(e) => setEditInternalRemarks(e.target.value)}
+                      className="h-8 text-[12px] bg-white dark:bg-[#161619]"
+                    />
                   </div>
                 </div>
               </div>
 
-              {editLineItems.map((li, idx) => (
-                <div key={idx}>
-                  {li.service_type === "Ticket" ? renderTicketForm(li, idx, true) : (
-                    <div className="p-4 rounded-xl border border-gray-200 dark:border-gray-800 space-y-3 bg-gray-50/50">
-                      <Input
-                        placeholder="Description"
-                        value={li.description}
-                        onChange={(e) => {
-                          const arr = [...editLineItems];
-                          arr[idx].description = e.target.value;
-                          setEditLineItems(arr);
-                        }}
-                        className="h-9 text-[13px]"
-                      />
+              {/* Multi-Ticket Tabs & Form (Edit Dialog) */}
+              {editLineItems[0]?.service_type === "Ticket" ? (
+                <div className="space-y-3">
+                  {/* Tabs Bar */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 border-b border-slate-200 dark:border-slate-800">
+                    {editLineItems.map((li, idx) => (
+                      <div key={idx} className="flex items-center">
+                        <button
+                          type="button"
+                          onClick={() => setActiveEditTicketTab(idx)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+                            activeEditTicketTab === idx
+                              ? "bg-primary text-primary-foreground shadow-sm"
+                              : "bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300"
+                          }`}
+                        >
+                          <Plane className="h-3.5 w-3.5" />
+                          <span>{li.pax_name ? li.pax_name.slice(0, 18) : `Ticket ${idx + 1}`}</span>
+                        </button>
+                        {editLineItems.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = editLineItems.filter((_, i) => i !== idx);
+                              setEditLineItems(updated);
+                              if (activeEditTicketTab >= updated.length) setActiveEditTicketTab(Math.max(0, updated.length - 1));
+                            }}
+                            className="p-1 text-slate-400 hover:text-red-500 ml-0.5"
+                            title="Remove this ticket"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs px-2.5 gap-1 border-dashed"
+                      onClick={() => {
+                        const newTicket = createDefaultTicketItem();
+                        setEditLineItems((prev) => [...prev, newTicket]);
+                        setActiveEditTicketTab(editLineItems.length);
+                      }}
+                    >
+                      <Plus className="h-3 w-3" /> Add Ticket
+                    </Button>
+                  </div>
+
+                  {/* Active Ticket Form */}
+                  {renderTicketForm(editLineItems[activeEditTicketTab] || editLineItems[0], activeEditTicketTab, true)}
+
+                  {/* Multi-Ticket Grand Total Summary */}
+                  {editLineItems.length > 1 && (
+                    <div className="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/60 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs font-semibold">
+                      <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                        <Layers className="h-4 w-4" />
+                        <span>Combined Invoice: <strong>{editLineItems.length} Passenger Tickets</strong></span>
+                      </div>
+                      <div className="flex items-center gap-4 font-mono">
+                        <span>Grand Total Due: <strong className="text-primary text-sm">PKR {editLineItems.reduce((sum, item) => sum + (item.customer_net || 0), 0).toLocaleString()}</strong></span>
+                        <span>Total Agency Margin: <strong className="text-blue-600 dark:text-blue-400">PKR {editLineItems.reduce((sum, item) => sum + (item.agency_margin || 0), 0).toLocaleString()}</strong></span>
+                      </div>
                     </div>
                   )}
                 </div>
-              ))}
+              ) : (
+                /* Non-ticket Line Items */
+                editLineItems.map((li, idx) => (
+                  <div key={idx} className="p-4 rounded-xl border border-gray-200 dark:border-gray-800 space-y-3 bg-gray-50/50">
+                    <Input
+                      placeholder="Description"
+                      value={li.description}
+                      onChange={(e) => {
+                        const arr = [...editLineItems];
+                        arr[idx].description = e.target.value;
+                        setEditLineItems(arr);
+                      }}
+                      className="h-9 text-[13px]"
+                    />
+                  </div>
+                ))
+              )}
 
               <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
                 <Button variant="outline" onClick={() => setEditInvoiceId(null)}>Cancel</Button>

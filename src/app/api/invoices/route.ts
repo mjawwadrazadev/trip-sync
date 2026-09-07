@@ -156,7 +156,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const {
       customer_id, currency, line_items, bsp_flag, bsp_billing_period,
-      payment_mode, remarks, visit_type, spo_id, supplier_id,
+      payment_mode, remarks, internal_remarks, customer_remarks, visit_type, spo_id, supplier_id,
       print_name, cost_center, adj_date, our_xo, client_xo,
     } = body;
 
@@ -236,7 +236,9 @@ export async function POST(req: NextRequest) {
       bsp_flag: bsp_flag || false,
       bsp_billing_period: bsp_billing_period || null,
       payment_mode: payment_mode || "CR",
-      remarks: remarks || "NORMAL",
+      remarks: remarks || "",
+      internal_remarks: internal_remarks || remarks || "",
+      customer_remarks: customer_remarks || "",
       visit_type: visit_type || "Visitor",
       spo_id: spo_id || null,
       supplier_id: supplier_id || null,

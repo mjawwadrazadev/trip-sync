@@ -15,6 +15,8 @@ export interface IInvoice extends Document {
   bsp_billing_period: string | null;
   payment_mode: string;
   remarks: string;
+  internal_remarks?: string;
+  customer_remarks?: string;
   visit_type: string;
   spo_id: Types.ObjectId | null;
   supplier_id: Types.ObjectId | null;
@@ -42,7 +44,9 @@ const InvoiceSchema = new Schema<IInvoice>(
     bsp_flag: { type: Boolean, default: false },
     bsp_billing_period: { type: String, default: null },
     payment_mode: { type: String, default: "CR" },
-    remarks: { type: String, default: "NORMAL" },
+    remarks: { type: String, default: "" },
+    internal_remarks: { type: String, default: "" },
+    customer_remarks: { type: String, default: "" },
     visit_type: { type: String, default: "Visitor" },
     spo_id: { type: Schema.Types.ObjectId, ref: "User", default: null },
     supplier_id: { type: Schema.Types.ObjectId, ref: "Supplier", default: null },

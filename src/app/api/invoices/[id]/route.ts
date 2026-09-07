@@ -32,7 +32,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const body = await req.json();
     const {
       customer_id, currency, bsp_flag, bsp_billing_period, line_items,
-      payment_mode, remarks, visit_type, spo_id, supplier_id,
+      payment_mode, remarks, internal_remarks, customer_remarks, visit_type, spo_id, supplier_id,
       print_name, cost_center, adj_date, our_xo, client_xo,
     } = body;
 
@@ -42,6 +42,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (bsp_billing_period !== undefined) invoice.bsp_billing_period = bsp_billing_period;
     if (payment_mode !== undefined) invoice.payment_mode = payment_mode;
     if (remarks !== undefined) invoice.remarks = remarks;
+    if (internal_remarks !== undefined) invoice.internal_remarks = internal_remarks;
+    if (customer_remarks !== undefined) invoice.customer_remarks = customer_remarks;
     if (visit_type !== undefined) invoice.visit_type = visit_type;
     if (spo_id !== undefined) invoice.spo_id = spo_id ? new mongoose.Types.ObjectId(spo_id) : null;
     if (supplier_id !== undefined) invoice.supplier_id = supplier_id ? new mongoose.Types.ObjectId(supplier_id) : null;
