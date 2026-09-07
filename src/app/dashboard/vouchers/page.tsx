@@ -362,9 +362,26 @@ export default function VouchersPage() {
     }
   }
 
-  // â”€â”€ Post voucher â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Post voucher ──────────────────────────────────────────────────────────────────────────
 
   async function handlePost(id: string, voucherNo: string) {
+    const { totalDebit, totalCredit } = calcTotals(form.entries);
+    const diff = Math.abs(totalDebit - totalCredit);
+    if (diff > 0.01) {
+      toast.add({
+        title: `Cannot post: Debit (PKR ${totalDebit.toLocaleString()}) and Credit (PKR ${totalCredit.toLocaleString()}) must be equal. Difference: PKR ${diff.toLocaleString()}`,
+        type: "error",
+      });
+      return;
+    }
+    if (totalDebit <= 0) {
+      toast.add({
+        title: "Cannot post voucher with 0 amount",
+        type: "error",
+      });
+      return;
+    }
+
     setPosting(true);
     try {
       const res = await fetch(`/api/vouchers/${id}/post`, { method: "POST" });
@@ -398,6 +415,7 @@ export default function VouchersPage() {
   function renderVoucherForm(isEdit = false, editVoucher?: Voucher) {
     const { totalDebit, totalCredit } = calcTotals(form.entries);
     const isPosted = editVoucher?.status === "Posted";
+    const isBalanced = Math.abs(totalDebit - totalCredit) <= 0.01 && totalDebit > 0;
 
     return (
       <div className="space-y-4">
@@ -457,7 +475,6 @@ export default function VouchersPage() {
               value={form.name_on_voucher}
               onChange={(e) => setForm((p) => ({ ...p, name_on_voucher: e.target.value }))}
               disabled={isPosted}
-              list="account-suggestions"
             />
           </div>
           <div>
@@ -673,14 +690,38 @@ export default function VouchersPage() {
               {/* Totals row */}
               <div
                 className="grid items-center gap-1 px-2 py-2 bg-gray-50 dark:bg-[#111113] border-t border-gray-200 dark:border-gray-800 font-semibold text-sm"
-                style={{ gridTemplateColumns: "48px 80px 90px 100px 1fr 160px 96px 96px 36px" }}
+                style={{ gridTemplateColumns: "48px 80px 110px 100px 1fr 160px 96px 96px 36px" }}
               >
                 <span className="col-span-6 text-xs text-gray-500 text-right pr-2">Totals:</span>
-                <span className="text-right text-green-700 dark:text-green-400">
+                <span className="text-right text-green-700 dark:text-green-400 font-mono">
                   {totalDebit.toLocaleString("en-PK", { minimumFractionDigits: 2 })}
                 </span>
-                <span className="text-right text-blue-700 dark:text-blue-400">
+                <span className="text-right text-blue-700 dark:text-blue-400 font-mono">
                   {totalCredit.toLocaleString("en-PK", { minimumFractionDigits: 2 })}
+                </span>
+                <span />
+              </div>
+
+              {/* Balance / Difference row */}
+              <div
+                className={`grid items-center gap-1 px-2 py-1.5 border-t text-xs font-semibold ${
+                  isBalanced
+                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                    : totalDebit === 0 && totalCredit === 0
+                    ? "bg-gray-50 dark:bg-[#111113] text-gray-500 border-gray-200 dark:border-gray-800"
+                    : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20"
+                }`}
+                style={{ gridTemplateColumns: "48px 80px 110px 100px 1fr 160px 96px 96px 36px" }}
+              >
+                <span className="col-span-6 text-right pr-2">
+                  {isBalanced
+                    ? "✓ Balanced (Debit = Credit):"
+                    : "Balance / Difference (Debit − Credit):"}
+                </span>
+                <span className="col-span-2 text-right font-mono font-bold">
+                  {isBalanced
+                    ? "PKR 0.00"
+                    : `PKR ${(totalDebit - totalCredit).toLocaleString("en-PK", { minimumFractionDigits: 2 })}`}
                 </span>
                 <span />
               </div>
