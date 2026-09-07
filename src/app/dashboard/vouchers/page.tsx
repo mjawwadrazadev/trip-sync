@@ -437,7 +437,7 @@ export default function VouchersPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <Label className="text-xs font-medium text-gray-500">Voucher Type</Label>
+              <Label className="text-xs font-medium text-gray-500">Voucher Type <span className="text-red-500">*</span></Label>
               {isEdit && <Badge variant="outline" className="text-[10px] py-0">Locked</Badge>}
             </div>
             <Select
@@ -458,7 +458,7 @@ export default function VouchersPage() {
             </Select>
           </div>
           <div>
-            <Label className="text-xs font-medium text-gray-500 mb-1.5 block">Voucher Date</Label>
+            <Label className="text-xs font-medium text-gray-500 mb-1.5 block">Voucher Date <span className="text-red-500">*</span></Label>
             <Input
               type="date"
               className="h-9 text-sm"
@@ -468,7 +468,7 @@ export default function VouchersPage() {
             />
           </div>
           <div>
-            <Label className="text-xs font-medium text-gray-500 mb-1.5 block">Name on Voucher</Label>
+            <Label className="text-xs font-medium text-gray-500 mb-1.5 block">Name on Voucher <span className="text-red-500">*</span></Label>
             <Input
               className="h-9 text-sm"
               placeholder="Payee / Payer name"
@@ -492,7 +492,7 @@ export default function VouchersPage() {
         {/* Row 2: Bank / Source, Debit Account, Debit Amount, Cheque No */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div>
-            <Label className="text-xs font-medium text-gray-500 mb-1.5 block">Bank / Source</Label>
+            <Label className="text-xs font-medium text-gray-500 mb-1.5 block">Bank / Source <span className="text-red-500">*</span></Label>
             <Select
               onValueChange={(v) => {
                 const b = BANK_ACCOUNTS.find((item) => item.name === v);
@@ -511,7 +511,7 @@ export default function VouchersPage() {
             </Select>
           </div>
           <div>
-            <Label className="text-xs font-medium text-gray-500 mb-1.5 block">Debit Account</Label>
+            <Label className="text-xs font-medium text-gray-500 mb-1.5 block">Debit Account <span className="text-red-500">*</span></Label>
             <Input
               className="h-9 text-sm font-medium text-primary"
               placeholder="Associated account"
@@ -522,7 +522,7 @@ export default function VouchersPage() {
             />
           </div>
           <div>
-            <Label className="text-xs font-medium text-gray-500 mb-1.5 block">Debit Amount</Label>
+            <Label className="text-xs font-medium text-gray-500 mb-1.5 block">Debit Amount <span className="text-red-500">*</span></Label>
             <Input
               type="number"
               className="h-9 text-sm font-mono font-bold"
@@ -621,7 +621,7 @@ export default function VouchersPage() {
                       onChange={(e) => updateEntry(idx, "ref_no", e.target.value)}
                       disabled={isPosted}
                       placeholder="Inv # / Ref"
-                      list="invoice-suggestions"
+                      {...(entry.ref_code?.toLowerCase() !== "i" ? { list: "invoice-suggestions" } : {})}
                     />
                     <Input
                       type="date"
@@ -659,11 +659,12 @@ export default function VouchersPage() {
                     </div>
                     <Input
                       type="number"
-                      className="h-7 text-xs px-1.5 text-right"
+                      className={`h-7 text-xs px-1.5 text-right ${idx === 0 ? "bg-blue-50 dark:bg-blue-950/20 font-semibold text-primary" : ""}`}
                       value={entry.debit || ""}
                       onChange={(e) => updateEntry(idx, "debit", parseFloat(e.target.value) || 0)}
                       disabled={isPosted}
                       placeholder="0"
+                      title={idx === 0 ? "Auto-linked to Debit Amount above" : undefined}
                     />
                     <Input
                       type="number"
