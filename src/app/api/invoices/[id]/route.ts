@@ -94,6 +94,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
           // Airfare & IATA Taxes
           base_fare: parseFloat(li.base_fare) || 0,
+          tax_sp: parseFloat(li.tax_sp) || 0,
           tax_dof: parseFloat(li.tax_dof) || 0,
           tax_yq: parseFloat(li.tax_yq) || 0,
           tax_yr: parseFloat(li.tax_yr) || 0,

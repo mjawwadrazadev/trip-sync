@@ -286,6 +286,7 @@ export async function POST(req: NextRequest) {
 
         // Airfare & IATA Taxes
         base_fare: parseFloat(String(item.base_fare || 0)) || 0,
+        tax_sp: parseFloat(String(item.tax_sp || 0)) || 0,
         tax_dof: parseFloat(String(item.tax_dof || 0)) || 0,
         tax_yq: parseFloat(String(item.tax_yq || 0)) || 0,
         tax_yr: parseFloat(String(item.tax_yr || 0)) || 0,

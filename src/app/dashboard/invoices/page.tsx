@@ -803,6 +803,7 @@ export default function InvoicesPage() {
       airline_city_taxes: Array.isArray(li.airline_city_taxes) ? (li.airline_city_taxes as DynamicTaxItem[]) : [{ code: "XT", amount: "0" }],
       city_taxes: Array.isArray(li.city_taxes) ? (li.city_taxes as DynamicTaxItem[]) : [{ code: "City Tax", amount: "0" }],
       base_fare: String(li.base_fare || "0"),
+      tax_sp: String(li.tax_sp || "0"),
       tax_dof: String(li.tax_dof || "0"),
       tax_yq: String(li.tax_yq || "0"),
       tax_yr: String(li.tax_yr || "0"),
