@@ -91,7 +91,6 @@ const navSections: NavSection[] = [
         label: "Vouchers",
         icon: BookOpen,
         children: [
-          { href: "/dashboard/vouchers", label: "All Vouchers", type: null },
           { href: "/dashboard/vouchers?type=RV", label: "RV — Receipt", type: "RV" },
           { href: "/dashboard/vouchers?type=PV", label: "PV — Payment", type: "PV" },
           { href: "/dashboard/vouchers?type=JV", label: "JV — Journal", type: "JV" },
