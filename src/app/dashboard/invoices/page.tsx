@@ -1873,11 +1873,19 @@ export default function InvoicesPage() {
           </h1>
           <p className="text-[13px] text-gray-500 dark:text-gray-400 mt-1">Manage ticket sales, airline billing, and travel invoices</p>
         </div>
-        <Dialog open={showNew} onOpenChange={setShowNew}>
+        <Dialog
+          open={showNew}
+          onOpenChange={(open, details) => {
+            if (!open && (details?.reason === "outside-press" || details?.reason === "escape-key")) {
+              return;
+            }
+            setShowNew(open);
+          }}
+        >
           <DialogTrigger className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-[13px] font-medium text-primary-foreground hover:bg-primary/90 shadow-sm transition-colors">
             <Plus className="h-4 w-4" /> New Invoice / Ticket Sale
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[96vw] md:max-w-[95vw] lg:max-w-[1400px] w-[96vw] max-h-[96vh] overflow-y-auto p-5" onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
+          <DialogContent className="sm:max-w-[96vw] md:max-w-[95vw] lg:max-w-[1400px] w-[96vw] max-h-[96vh] overflow-y-auto p-5">
             <DialogHeader>
               <DialogTitle className="text-lg font-bold flex items-center gap-2">
                 <FileText className="h-5 w-5 text-primary" />
@@ -2372,8 +2380,16 @@ export default function InvoicesPage() {
       </Card>
 
       {/* Edit Invoice Dialog - Full ERP Clone */}
-      <Dialog open={!!editInvoiceId} onOpenChange={(open) => !open && setEditInvoiceId(null)}>
-        <DialogContent className="sm:max-w-[96vw] md:max-w-[95vw] lg:max-w-[1400px] w-[96vw] max-h-[96vh] overflow-y-auto p-5" onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
+      <Dialog
+        open={!!editInvoiceId}
+        onOpenChange={(open, details) => {
+          if (!open && (details?.reason === "outside-press" || details?.reason === "escape-key")) {
+            return;
+          }
+          if (!open) setEditInvoiceId(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-[96vw] md:max-w-[95vw] lg:max-w-[1400px] w-[96vw] max-h-[96vh] overflow-y-auto p-5">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold flex items-center gap-2">
               <Pencil className="h-5 w-5 text-primary" /> Edit Ticket Invoice
