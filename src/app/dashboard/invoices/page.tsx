@@ -1069,7 +1069,7 @@ export default function InvoicesPage() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
           
           {/* LEFT BOX (Routing & Segments Table + Conjunction Ticket) */}
-          <div className="lg:col-span-6 space-y-3.5 flex flex-col justify-between">
+          <div className="lg:col-span-6 space-y-3.5 flex flex-col gap-3">
             {/* Flight Segments Table (Max 5 Legs) */}
             <div className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden bg-white dark:bg-[#111113]">
               <div className="bg-slate-100 dark:bg-slate-900 px-3 py-1.5 flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
