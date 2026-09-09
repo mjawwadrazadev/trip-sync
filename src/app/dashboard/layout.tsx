@@ -63,10 +63,9 @@ const navSections: NavSection[] = [
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
       {
         href: "/dashboard/invoices",
-        label: "All Invoices",
+        label: "Invoices",
         icon: FileText,
         children: [
-          { href: "/dashboard/invoices", label: "All Invoices", type: null },
           { href: "/dashboard/invoices?type=Ticket", label: "Tickets", type: "Ticket" },
           { href: "/dashboard/invoices?type=Hotel", label: "Hotels", type: "Hotel" },
           { href: "/dashboard/invoices?type=Umrah", label: "Umrah", type: "Umrah" },
