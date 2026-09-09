@@ -1256,6 +1256,46 @@ export default function InvoicesPage() {
                 </div>
               </div>
             </div>
+
+            {/* Cancellation Charges */}
+            <div className="p-2 bg-white dark:bg-[#111113] rounded-lg border border-slate-200 dark:border-slate-800 space-y-1">
+              <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 block">Cancellation Charges</span>
+              <div className="grid grid-cols-2 gap-2 text-[10px]">
+                <div className="flex items-center gap-1">
+                  <span className="w-10 text-slate-500 font-medium">Self:</span>
+                  <Input
+                    type="number"
+                    placeholder="0.00"
+                    value={item.cancellation_charges_self || ""}
+                    onChange={(e) => updateTicketLineItem(itemIdx, "cancellation_charges_self", e.target.value, isEdit)}
+                    className="h-6 flex-1 text-[10px] font-mono text-right"
+                  />
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="w-14 text-slate-500 font-medium">Supplier:</span>
+                  <Input
+                    type="number"
+                    placeholder="0.00"
+                    value={item.cancellation_charges_supplier || ""}
+                    onChange={(e) => updateTicketLineItem(itemIdx, "cancellation_charges_supplier", e.target.value, isEdit)}
+                    className="h-6 flex-1 text-[10px] font-mono text-right"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Customer Remarks */}
+            <div className="p-2 bg-white dark:bg-[#111113] rounded-lg border border-slate-200 dark:border-slate-800 space-y-1">
+              <Label className="text-[10px] font-semibold text-slate-600 dark:text-slate-400">
+                Customer Remarks (Appears on Customer Invoice)
+              </Label>
+              <Input
+                placeholder="e.g. Non-refundable after departure / Baggage 30kg / Passenger note"
+                value={item.customer_remarks || ""}
+                onChange={(e) => updateTicketLineItem(itemIdx, "customer_remarks", e.target.value, isEdit)}
+                className="h-7 text-[11px] bg-white dark:bg-[#161619]"
+              />
+            </div>
           </div>
 
           {/* RIGHT BOX (Airline City Tax, IATA / Domestic Taxes, Commercials, Totals) */}
@@ -1738,46 +1778,6 @@ export default function InvoicesPage() {
                     Auto Update
                   </label>
                 </div>
-              </div>
-
-              {/* Cancellation Charges */}
-              <div className="p-2 bg-white dark:bg-[#111113] rounded-lg border border-slate-200 dark:border-slate-800 space-y-1">
-                <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 block">Cancellation Charges</span>
-                <div className="grid grid-cols-2 gap-2 text-[10px]">
-                  <div className="flex items-center gap-1">
-                    <span className="w-10 text-slate-500 font-medium">Self:</span>
-                    <Input
-                      type="number"
-                      placeholder="0.00"
-                      value={item.cancellation_charges_self || ""}
-                      onChange={(e) => updateTicketLineItem(itemIdx, "cancellation_charges_self", e.target.value, isEdit)}
-                      className="h-6 flex-1 text-[10px] font-mono text-right"
-                    />
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span className="w-14 text-slate-500 font-medium">Supplier:</span>
-                    <Input
-                      type="number"
-                      placeholder="0.00"
-                      value={item.cancellation_charges_supplier || ""}
-                      onChange={(e) => updateTicketLineItem(itemIdx, "cancellation_charges_supplier", e.target.value, isEdit)}
-                      className="h-6 flex-1 text-[10px] font-mono text-right"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Customer Remarks input */}
-              <div className="p-2 bg-white dark:bg-[#111113] rounded-lg border border-slate-200 dark:border-slate-800 space-y-1">
-                <Label className="text-[10px] font-semibold text-slate-600 dark:text-slate-400">
-                  Customer Remarks (Appears on Customer Invoice)
-                </Label>
-                <Input
-                  placeholder="e.g. Non-refundable after departure / Baggage 30kg / Passenger note"
-                  value={item.customer_remarks || ""}
-                  onChange={(e) => updateTicketLineItem(itemIdx, "customer_remarks", e.target.value, isEdit)}
-                  className="h-7 text-[11px] bg-white dark:bg-[#161619]"
-                />
               </div>
             </div>
 
