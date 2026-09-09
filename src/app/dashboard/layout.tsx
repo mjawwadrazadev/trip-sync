@@ -172,7 +172,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-3 py-4 overflow-y-auto">
+        <nav className="flex-1 px-3 py-4 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           <Suspense fallback={<div className="text-xs text-gray-400 px-3">Loading menu...</div>}>
             <SidebarNav pathname={pathname} />
           </Suspense>
