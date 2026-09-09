@@ -438,14 +438,13 @@ export default function VouchersPage() {
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <Label className="text-xs font-medium text-gray-500">Voucher Type <span className="text-red-500">*</span></Label>
-              {isEdit && <Badge variant="outline" className="text-[10px] py-0">Locked</Badge>}
+              <Badge variant="outline" className="text-[10px] py-0">Locked</Badge>
             </div>
             <Select
               value={form.voucher_type}
-              onValueChange={(v) => setForm((p) => ({ ...p, voucher_type: v as VoucherType }))}
-              disabled={isEdit || isPosted}
+              disabled={true}
             >
-              <SelectTrigger className="h-9 text-sm">
+              <SelectTrigger className="h-9 text-sm bg-gray-100/80 dark:bg-gray-800/80 cursor-not-allowed">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
