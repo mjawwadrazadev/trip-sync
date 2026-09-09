@@ -918,7 +918,7 @@ export default function InvoicesPage() {
             <div className="space-y-1">
               <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Pax *</Label>
               <Input
-                placeholder="MR JAVED JAHANZEEB"
+                placeholder="MR. First Name Last Name"
                 value={item.pax_name || ""}
                 onChange={(e) => updateTicketLineItem(itemIdx, "pax_name", e.target.value.toUpperCase(), isEdit)}
                 className="h-8 text-[12px] uppercase font-semibold bg-white dark:bg-[#161619]"
@@ -964,7 +964,7 @@ export default function InvoicesPage() {
             <div className="space-y-1">
               <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Ticket No. (3-4-3-3) *</Label>
               <Input
-                placeholder="157-2127-850-017"
+                placeholder="000-0000-000-000"
                 value={item.ticket_number || ""}
                 onChange={(e) => updateTicketLineItem(itemIdx, "ticket_number", e.target.value, isEdit)}
                 className="h-8 text-[12px] font-mono font-bold bg-white dark:bg-[#161619]"
@@ -973,7 +973,7 @@ export default function InvoicesPage() {
             <div className="space-y-1">
               <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">PNR</Label>
               <Input
-                placeholder="PNR123"
+                placeholder="e.g. ABC123"
                 value={item.gds_pnr || ""}
                 onChange={(e) => updateTicketLineItem(itemIdx, "gds_pnr", e.target.value.toUpperCase(), isEdit)}
                 className="h-8 text-[12px] font-mono uppercase font-bold text-blue-600 bg-white dark:bg-[#161619]"
@@ -1031,7 +1031,7 @@ export default function InvoicesPage() {
             <div className="space-y-1">
               <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Sector *</Label>
               <Input
-                placeholder="FOU / LHE-DOH"
+                placeholder="ORG / ORG-DST"
                 value={item.sector || ""}
                 onChange={(e) => updateTicketLineItem(itemIdx, "sector", e.target.value.toUpperCase(), isEdit)}
                 className="h-8 text-[12px] uppercase font-mono bg-white dark:bg-[#161619]"
@@ -1105,7 +1105,7 @@ export default function InvoicesPage() {
                       <tr key={segIdx} className="border-b border-slate-100 dark:border-slate-800/60">
                         <td className="p-1">
                           <Input
-                            placeholder="ISB/DXB"
+                            placeholder="XXX"
                             value={seg.city}
                             list="city-airport-options"
                             onChange={(e) => updateFlightSegment(itemIdx, segIdx, "city", e.target.value.toUpperCase(), isEdit)}
@@ -1180,7 +1180,7 @@ export default function InvoicesPage() {
                 <div className="space-y-1">
                   <Label className="text-[10px] text-slate-500 font-semibold">Conjunction Ticket No. (3-4-3-3)</Label>
                   <Input
-                    placeholder="157-2127-850-018"
+                    placeholder="000-0000-000-000"
                     value={item.conjunction_ticket_no || ""}
                     onChange={(e) => updateTicketLineItem(itemIdx, "conjunction_ticket_no", e.target.value, isEdit)}
                     className="h-7 text-[11px] font-mono bg-white dark:bg-[#161619]"
@@ -1189,7 +1189,7 @@ export default function InvoicesPage() {
                 <div className="space-y-1">
                   <Label className="text-[10px] text-slate-500 font-semibold">Route Details</Label>
                   <Input
-                    placeholder="LHE-DOH-LHR"
+                    placeholder="ORG-DST-DST"
                     value={item.conjunction_route || ""}
                     onChange={(e) => updateTicketLineItem(itemIdx, "conjunction_route", e.target.value.toUpperCase(), isEdit)}
                     className="h-7 text-[11px] font-mono uppercase bg-white dark:bg-[#161619]"
@@ -1202,7 +1202,7 @@ export default function InvoicesPage() {
                 <div className="space-y-1">
                   <Label className="text-[9px] text-slate-500">6th City</Label>
                   <Input
-                    placeholder="LHR"
+                    placeholder="XXX"
                     list="city-airport-options"
                     value={item.conjunction_city || ""}
                     onChange={(e) => updateTicketLineItem(itemIdx, "conjunction_city", e.target.value.toUpperCase(), isEdit)}
@@ -1212,7 +1212,7 @@ export default function InvoicesPage() {
                 <div className="space-y-1">
                   <Label className="text-[9px] text-slate-500">Fl.No</Label>
                   <Input
-                    placeholder="007"
+                    placeholder="000"
                     value={item.conjunction_flight_no || ""}
                     onChange={(e) => updateTicketLineItem(itemIdx, "conjunction_flight_no", e.target.value, isEdit)}
                     className="h-6 text-[10px]"
