@@ -1873,26 +1873,31 @@ export default function InvoicesPage() {
           </h1>
           <p className="text-[13px] text-gray-500 dark:text-gray-400 mt-1">Manage ticket sales, airline billing, and travel invoices</p>
         </div>
-        <Dialog
-          open={showNew}
-          onOpenChange={(open, details) => {
-            if (!open && (details?.reason === "outside-press" || details?.reason === "escape-key")) {
-              return;
-            }
-            setShowNew(open);
+        <Button
+          onClick={() => {
+            if (editInvoiceId) setEditInvoiceId(null);
+            setShowNew(!showNew);
           }}
+          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-[13px] font-medium text-primary-foreground hover:bg-primary/90 shadow-sm transition-colors cursor-pointer"
         >
-          <DialogTrigger className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-[13px] font-medium text-primary-foreground hover:bg-primary/90 shadow-sm transition-colors">
-            <Plus className="h-4 w-4" /> New Invoice / Ticket Sale
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[96vw] md:max-w-[95vw] lg:max-w-[1400px] w-[96vw] max-h-[96vh] overflow-y-auto p-5">
-            <DialogHeader>
-              <DialogTitle className="text-lg font-bold flex items-center gap-2">
-                <FileText className="h-5 w-5 text-primary" />
-                {defaultType === "Ticket" ? "Ticket Booking & Sale Invoice" : "Create New Invoice"}
-              </DialogTitle>
-            </DialogHeader>
+          {showNew ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+          {showNew ? "Close Form" : "New Invoice / Ticket Sale"}
+        </Button>
+      </div>
 
+      {/* Inline Create Invoice Form Card */}
+      {showNew && (
+        <Card className="mb-6 border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111113] shadow-md">
+          <CardHeader className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex flex-row items-center justify-between">
+            <CardTitle className="text-base font-bold flex items-center gap-2">
+              <FileText className="h-5 w-5 text-primary" />
+              {defaultType === "Ticket" ? "Ticket Booking & Sale Invoice" : "Create New Invoice"}
+            </CardTitle>
+            <Button variant="ghost" size="sm" onClick={() => setShowNew(false)} className="h-8 w-8 p-0">
+              <X className="h-4 w-4" />
+            </Button>
+          </CardHeader>
+          <CardContent className="p-5">
             <div className="space-y-3.5 pt-1">
               {/* Top Invoice Header — Single Row: all fields in one line */}
               <div className="p-3 bg-slate-100/70 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-800 text-[12px]">
@@ -2102,9 +2107,9 @@ export default function InvoicesPage() {
                 </Button>
               </div>
             </div>
-          </DialogContent>
-        </Dialog>
-      </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Modern Search & Filters Bar */}
       <Card className="bg-white dark:bg-[#111113] border-gray-200/80 dark:border-[#1e1e21] shadow-sm mb-5">
@@ -2379,22 +2384,18 @@ export default function InvoicesPage() {
         </CardContent>
       </Card>
 
-      {/* Edit Invoice Dialog - Full ERP Clone */}
-      <Dialog
-        open={!!editInvoiceId}
-        onOpenChange={(open, details) => {
-          if (!open && (details?.reason === "outside-press" || details?.reason === "escape-key")) {
-            return;
-          }
-          if (!open) setEditInvoiceId(null);
-        }}
-      >
-        <DialogContent className="sm:max-w-[96vw] md:max-w-[95vw] lg:max-w-[1400px] w-[96vw] max-h-[96vh] overflow-y-auto p-5">
-          <DialogHeader>
-            <DialogTitle className="text-lg font-bold flex items-center gap-2">
+      {/* Inline Edit Invoice Form Card */}
+      {!!editInvoiceId && (
+        <Card className="mb-6 border-blue-300 dark:border-blue-800/80 bg-white dark:bg-[#111113] shadow-lg">
+          <CardHeader className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex flex-row items-center justify-between bg-blue-50/50 dark:bg-blue-950/20">
+            <CardTitle className="text-base font-bold flex items-center gap-2 text-blue-700 dark:text-blue-300">
               <Pencil className="h-5 w-5 text-primary" /> Edit Ticket Invoice
-            </DialogTitle>
-          </DialogHeader>
+            </CardTitle>
+            <Button variant="ghost" size="sm" onClick={() => setEditInvoiceId(null)} className="h-8 w-8 p-0">
+              <X className="h-4 w-4" />
+            </Button>
+          </CardHeader>
+          <CardContent className="p-5">
           {editLoading ? (
             <div className="flex items-center justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
           ) : (
@@ -2581,8 +2582,9 @@ export default function InvoicesPage() {
               </div>
             </div>
           )}
-        </DialogContent>
-      </Dialog>
+        </CardContent>
+      </Card>
+    )}
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={!!deleteInvoiceId} onOpenChange={() => setDeleteInvoiceId(null)}>
