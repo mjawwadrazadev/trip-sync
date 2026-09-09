@@ -29,15 +29,19 @@ import {
   ChevronRight,
   Menu,
   UserCheck,
-  Calendar,
   Building2,
   BookOpen,
+  User,
+  CreditCard,
+  HelpCircle,
+  FileSpreadsheet,
 } from "lucide-react";
 
 interface NavChild {
   href: string;
   label: string;
-  type: string | null;
+  type?: string | null;
+  tab?: string | null;
 }
 
 interface NavItem {
@@ -47,45 +51,80 @@ interface NavItem {
   children?: NavChild[];
 }
 
-const navItems: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+interface NavSection {
+  title: string;
+  items: NavItem[];
+}
+
+const navSections: NavSection[] = [
   {
-    href: "/dashboard/invoices",
-    label: "Invoices",
-    icon: FileText,
-    children: [
-      { href: "/dashboard/invoices", label: "All Invoices", type: null },
-      { href: "/dashboard/invoices?type=Ticket", label: "Tickets", type: "Ticket" },
-      { href: "/dashboard/invoices?type=Hotel", label: "Hotels", type: "Hotel" },
-      { href: "/dashboard/invoices?type=Package", label: "Packages", type: "Package" },
-      { href: "/dashboard/invoices?type=Umrah", label: "Umrah", type: "Umrah" },
-      { href: "/dashboard/invoices?type=Visa", label: "Visas", type: "Visa" },
-      { href: "/dashboard/invoices?type=Other", label: "Others", type: "Other" },
+    title: "OVERVIEW",
+    items: [
+      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      {
+        href: "/dashboard/invoices",
+        label: "All Invoices",
+        icon: FileText,
+        children: [
+          { href: "/dashboard/invoices", label: "All Invoices", type: null },
+          { href: "/dashboard/invoices?type=Ticket", label: "Tickets", type: "Ticket" },
+          { href: "/dashboard/invoices?type=Hotel", label: "Hotels", type: "Hotel" },
+          { href: "/dashboard/invoices?type=Umrah", label: "Umrah", type: "Umrah" },
+          { href: "/dashboard/invoices?type=Hajj", label: "Hajj", type: "Hajj" },
+          { href: "/dashboard/invoices?type=Visa", label: "Visas", type: "Visa" },
+          { href: "/dashboard/invoices?type=Other", label: "Others", type: "Other" },
+        ],
+      },
     ],
   },
-  { href: "/dashboard/customers", label: "Customers", icon: Users },
-  { href: "/dashboard/suppliers", label: "Suppliers", icon: Building2 },
-  { href: "/dashboard/payments", label: "Payments", icon: Wallet },
   {
-    href: "/dashboard/vouchers",
-    label: "Vouchers",
-    icon: BookOpen,
-    children: [
-      { href: "/dashboard/vouchers", label: "All Vouchers", type: null },
-      { href: "/dashboard/vouchers?type=RV", label: "RV — Receipt", type: "RV" },
-      { href: "/dashboard/vouchers?type=PV", label: "PV — Payment", type: "PV" },
-      { href: "/dashboard/vouchers?type=JV", label: "JV — Journal", type: "JV" },
-      { href: "/dashboard/vouchers?type=DN", label: "DN — Debit Note", type: "DN" },
-      { href: "/dashboard/vouchers?type=CD", label: "CD — Cash Deposit", type: "CD" },
+    title: "CONTACTS",
+    items: [
+      { href: "/dashboard/customers", label: "Customers", icon: Users },
+      { href: "/dashboard/suppliers", label: "Suppliers", icon: Building2 },
     ],
   },
-  { href: "/dashboard/expenses", label: "Expenses", icon: Receipt },
-  { href: "/dashboard/commissions", label: "Commissions", icon: TrendingUp },
-  { href: "/dashboard/approvals", label: "Approvals", icon: CheckCircle },
-  { href: "/dashboard/tax-codes", label: "Tax Codes", icon: Landmark },
-  { href: "/dashboard/reports", label: "Reports", icon: BarChart3 },
-  { href: "/dashboard/agents", label: "Team & Agents", icon: UserCheck },
-  { href: "/dashboard/settings", label: "Settings", icon: Settings },
+  {
+    title: "FINANCE",
+    items: [
+      {
+        href: "/dashboard/vouchers",
+        label: "Vouchers",
+        icon: BookOpen,
+        children: [
+          { href: "/dashboard/vouchers", label: "All Vouchers", type: null },
+          { href: "/dashboard/vouchers?type=RV", label: "RV — Receipt", type: "RV" },
+          { href: "/dashboard/vouchers?type=PV", label: "PV — Payment", type: "PV" },
+          { href: "/dashboard/vouchers?type=JV", label: "JV — Journal", type: "JV" },
+          { href: "/dashboard/vouchers?type=DN", label: "DN — Debit Note", type: "DN" },
+          { href: "/dashboard/vouchers?type=CD", label: "CD — Cash Deposit", type: "CD" },
+        ],
+      },
+      { href: "/dashboard/commissions", label: "Commissions", icon: TrendingUp },
+      { href: "/dashboard/tax-codes", label: "Tax Codes", icon: Landmark },
+      { href: "/dashboard/approvals", label: "Approvals", icon: CheckCircle },
+    ],
+  },
+  {
+    title: "REPORTS",
+    items: [
+      { href: "/dashboard/reports?tab=customer-ledger", label: "Customer Ledger", icon: FileText },
+      { href: "/dashboard/reports?tab=supplier-ledger", label: "Supplier Ledger", icon: Building2 },
+      { href: "/dashboard/reports?tab=analytics", label: "Business Analytics", icon: BarChart3 },
+      { href: "/dashboard/reports?tab=wht", label: "WHT Tax Report", icon: Landmark },
+      { href: "/dashboard/reports?tab=financial", label: "Financial Documents", icon: FileSpreadsheet },
+    ],
+  },
+  {
+    title: "ADMIN",
+    items: [
+      { href: "/dashboard/agents", label: "Team & Agents", icon: UserCheck },
+      { href: "/dashboard/settings?tab=profile", label: "Profile", icon: User },
+      { href: "/dashboard/settings?tab=agency", label: "Agency Details", icon: Building2 },
+      { href: "/dashboard/settings?tab=billing", label: "Billing", icon: CreditCard },
+      { href: "/dashboard/settings?tab=support", label: "Support", icon: HelpCircle },
+    ],
+  },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -130,7 +169,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
           <div>
             <h1 className="text-[15px] font-semibold tracking-tight text-gray-900 dark:text-gray-50">TripSync</h1>
-            <p className="text-[10px] text-gray-400 dark:text-gray-500 font-medium uppercase tracking-wider">Finance</p>
+            <p className="text-[10px] text-gray-400 dark:text-gray-500 font-medium uppercase tracking-wider">Finance &amp; ERP</p>
           </div>
         </div>
 
@@ -215,67 +254,93 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 function SidebarNav({ pathname }: { pathname: string }) {
   const searchParams = useSearchParams();
   return (
-    <div className="flex-1 space-y-4">
-      <div>
-        <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Menu</p>
-        <div className="space-y-0.5">
-          {navItems.slice(0, 1).map((item) => renderNavItem(item, pathname, searchParams))}
+    <div className="space-y-4">
+      {navSections.map((section) => (
+        <div key={section.title}>
+          <p className="px-3 mb-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+            {section.title}
+          </p>
+          <div className="space-y-0.5">
+            {section.items.map((item) => renderNavItem(item, pathname, searchParams))}
+          </div>
         </div>
-      </div>
-
-      <div>
-        <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Finance</p>
-        <div className="space-y-0.5">
-          {navItems.slice(1, 5).map((item) => renderNavItem(item, pathname, searchParams))}
-        </div>
-      </div>
-
-      <div>
-        <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Management</p>
-        <div className="space-y-0.5">
-          {navItems.slice(5).map((item) => renderNavItem(item, pathname, searchParams))}
-        </div>
-      </div>
+      ))}
     </div>
   );
 }
 
-function renderNavItem(item: (typeof navItems)[number], pathname: string, searchParams: { get: (key: string) => string | null }) {
-  const Icon = item.icon;
-  const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
-  const activeType = searchParams.get("type");
+function checkIsItemActive(itemHref: string, pathname: string, searchParams: { get: (k: string) => string | null }) {
+  const [basePath, query] = itemHref.split("?");
+  if (query) {
+    const params = new URLSearchParams(query);
+    const tabParam = params.get("tab");
+    const typeParam = params.get("type");
+    if (tabParam) return pathname === basePath && searchParams.get("tab") === tabParam;
+    if (typeParam) return pathname === basePath && searchParams.get("type") === typeParam;
+    return pathname === basePath;
+  }
+  if (itemHref === "/dashboard") return pathname === "/dashboard";
+  return pathname === basePath || pathname.startsWith(basePath + "/");
+}
 
-  // Parent link style: always use full active pill (same as Customers, Dashboard etc.)
+function checkIsChildActive(child: NavChild, searchParams: { get: (k: string) => string | null }) {
+  const activeType = searchParams.get("type");
+  const activeTab = searchParams.get("tab");
+  if (child.type !== undefined) {
+    return child.type ? activeType === child.type : !activeType;
+  }
+  if (child.tab !== undefined) {
+    return child.tab ? activeTab === child.tab : !activeTab;
+  }
+  return false;
+}
+
+function renderNavItem(
+  item: NavItem,
+  pathname: string,
+  searchParams: { get: (key: string) => string | null }
+) {
+  const Icon = item.icon;
+  const isActive = checkIsItemActive(item.href, pathname, searchParams);
+
   const parentClass = isActive
-    ? "bg-[#1a1a1d] text-white shadow-sm"
-    : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#1a1a1d] hover:text-gray-900 dark:hover:text-gray-200";
+    ? "bg-[#1a1a1d] text-white shadow-sm font-semibold"
+    : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#1a1a1d] hover:text-gray-900 dark:hover:text-gray-200 font-medium";
 
   return (
-    <div key={item.href} className="space-y-1">
+    <div key={item.href} className="space-y-0.5">
       <Link
         href={item.href}
-        className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all ${parentClass}`}
+        className={`group flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] transition-all ${parentClass}`}
       >
         <Icon className="h-[18px] w-[18px] flex-shrink-0" strokeWidth={isActive ? 2 : 1.7} />
-        <span>{item.label}</span>
-        {isActive && !item.children && <ChevronRight className="h-3.5 w-3.5 ml-auto opacity-50" />}
+        <span className="flex-1 truncate">{item.label}</span>
+        {item.children ? (
+          <ChevronRight
+            className={`h-3.5 w-3.5 opacity-60 transition-transform ${
+              isActive ? "rotate-90" : ""
+            }`}
+          />
+        ) : isActive ? (
+          <ChevronRight className="h-3.5 w-3.5 opacity-40" />
+        ) : null}
       </Link>
 
       {item.children && isActive && (
-        <div className="pl-2 space-y-0.5 mt-0.5">
+        <div className="pl-3 pr-1 space-y-0.5 my-0.5 border-l border-gray-200 dark:border-gray-800 ml-4">
           {item.children.map((child) => {
-            const isChildActive = child.type ? activeType === child.type : !activeType;
+            const isChildActive = checkIsChildActive(child, searchParams);
             return (
               <Link
                 key={child.href}
                 href={child.href}
-                className={`flex items-center py-2 px-3 text-[12.5px] font-medium rounded-lg transition-all ${
+                className={`flex items-center py-1.5 px-2.5 text-[12px] font-medium rounded-lg transition-all ${
                   isChildActive
-                    ? "bg-primary text-primary-foreground"
+                    ? "bg-primary text-primary-foreground font-semibold"
                     : "text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-[#1a1a1d] hover:text-gray-900 dark:hover:text-gray-200"
                 }`}
               >
-                {child.label}
+                <span className="truncate">{child.label}</span>
               </Link>
             );
           })}
@@ -284,3 +349,4 @@ function renderNavItem(item: (typeof navItems)[number], pathname: string, search
     </div>
   );
 }
+
