@@ -1891,7 +1891,7 @@ export default function InvoicesPage() {
           <CardContent className="p-5">
             <div className="space-y-3.5 pt-1">
               {/* Top Invoice Header — Single Row: all fields in one line */}
-              <div className="p-3 bg-slate-100/70 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-800 text-[12px]">
+              <div className="p-3 bg-slate-100/70 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-800 text-[12px] mb-4">
                 <div className="grid gap-2" style={{ gridTemplateColumns: "120px 120px 1fr 1fr 130px 110px 110px 100px 1fr" }}>
                   {/* Inv. Date */}
                   <div className="space-y-1">
@@ -1991,74 +1991,122 @@ export default function InvoicesPage() {
                   </div>
                 </div>
               </div>
+            </div>
 
-              {/* Multi-Ticket Tabs & Form */}
-              {lineItems[0]?.service_type === "Ticket" ? (
-                <div className="space-y-3">
-                  {/* Tabs Bar */}
-                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 border-b border-slate-200 dark:border-slate-800">
-                    {lineItems.map((li, idx) => (
-                      <div key={idx} className="flex items-center">
-                        <button
-                          type="button"
-                          onClick={() => setActiveTicketTab(idx)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
-                            activeTicketTab === idx
-                              ? "bg-primary text-primary-foreground shadow-sm"
-                              : "bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300"
-                          }`}
-                        >
-                          <Plane className="h-3.5 w-3.5" />
-                          <span>{li.pax_name ? li.pax_name.slice(0, 18) : `Ticket ${idx + 1}`}</span>
-                        </button>
-                        {lineItems.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const updated = lineItems.filter((_, i) => i !== idx);
-                              setLineItems(updated);
-                              if (activeTicketTab >= updated.length) setActiveTicketTab(Math.max(0, updated.length - 1));
-                            }}
-                            className="p-1 text-slate-400 hover:text-red-500 ml-0.5"
-                            title="Remove this ticket"
+            {/* Multi-Ticket Vertical Sidebar & Form (Create) */}
+            {lineItems[0]?.service_type === "Ticket" ? (
+              <div className="space-y-3">
+                <div className="flex flex-col md:flex-row gap-3 items-start">
+                  {/* Left Sidebar List of Tickets */}
+                  <div className="w-full md:w-52 flex-shrink-0 bg-slate-50 dark:bg-slate-900/60 p-2 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2">
+                    <div className="flex items-center justify-between px-2 py-1 border-b border-slate-200 dark:border-slate-800">
+                      <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                        <Plane className="h-3.5 w-3.5 text-primary" /> Tickets ({lineItems.length})
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-800"
+                        title="Add Ticket"
+                        onClick={() => {
+                          const newTicket = createDefaultTicketItem();
+                          setLineItems((prev) => [...prev, newTicket]);
+                          setActiveTicketTab(lineItems.length);
+                        }}
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+
+                    <div className="space-y-1.5 max-h-[550px] overflow-y-auto pr-0.5">
+                      {lineItems.map((li, idx) => {
+                        const isSelected = activeTicketTab === idx;
+                        const paxName = li.pax_name || `Ticket ${idx + 1}`;
+                        const tktNum = li.ticket_number || "";
+                        return (
+                          <div
+                            key={idx}
+                            onClick={() => setActiveTicketTab(idx)}
+                            className={`group relative flex items-center justify-between p-2 rounded-lg text-xs font-medium cursor-pointer transition-all border ${
+                              isSelected
+                                ? "bg-primary text-primary-foreground border-primary shadow-sm font-semibold"
+                                : "bg-white dark:bg-[#161619] hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200/80 dark:border-slate-800"
+                            }`}
                           >
-                            <X className="h-3 w-3" />
-                          </button>
-                        )}
-                      </div>
-                    ))}
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
+                                isSelected ? "bg-white/20 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
+                              }`}>
+                                {idx + 1}
+                              </span>
+                              <div className="truncate min-w-0">
+                                <p className="truncate text-[11.5px] leading-tight font-bold">{paxName}</p>
+                                {tktNum && (
+                                  <p className={`text-[9.5px] truncate font-mono mt-0.5 ${isSelected ? "text-primary-foreground/80" : "text-slate-400"}`}>
+                                    {tktNum}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+
+                            {lineItems.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const updated = lineItems.filter((_, i) => i !== idx);
+                                  setLineItems(updated);
+                                  if (activeTicketTab >= updated.length) setActiveTicketTab(Math.max(0, updated.length - 1));
+                                }}
+                                className={`p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity ${
+                                  isSelected ? "hover:bg-white/20 text-white" : "hover:bg-red-100 dark:hover:bg-red-950/50 text-slate-400 hover:text-red-600"
+                                }`}
+                                title="Delete ticket"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="h-7 text-xs px-2.5 gap-1 border-dashed"
+                      className="w-full h-8 text-xs gap-1.5 border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-[#161619] hover:bg-primary/5 hover:border-primary"
                       onClick={() => {
                         const newTicket = createDefaultTicketItem();
                         setLineItems((prev) => [...prev, newTicket]);
                         setActiveTicketTab(lineItems.length);
                       }}
                     >
-                      <Plus className="h-3 w-3" /> Add Ticket
+                      <Plus className="h-3.5 w-3.5" /> Add Ticket
                     </Button>
                   </div>
 
-                  {/* Active Ticket Form */}
-                  {renderTicketForm(lineItems[activeTicketTab] || lineItems[0], activeTicketTab, false)}
-
-                  {/* Multi-Ticket Grand Total Summary */}
-                  {lineItems.length > 1 && (
-                    <div className="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/60 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs font-semibold">
-                      <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
-                        <Layers className="h-4 w-4" />
-                        <span>Combined Invoice: <strong>{lineItems.length} Passenger Tickets</strong></span>
-                      </div>
-                      <div className="flex items-center gap-4 font-mono">
-                        <span>Grand Total Due: <strong className="text-primary text-sm">PKR {lineItems.reduce((sum, item) => sum + (item.customer_net || 0), 0).toLocaleString()}</strong></span>
-                        <span>Total Agency Margin: <strong className="text-blue-600 dark:text-blue-400">PKR {lineItems.reduce((sum, item) => sum + (item.agency_margin || 0), 0).toLocaleString()}</strong></span>
-                      </div>
-                    </div>
-                  )}
+                  {/* Right Active Ticket Form */}
+                  <div className="flex-1 min-w-0 w-full">
+                    {renderTicketForm(lineItems[activeTicketTab] || lineItems[0], activeTicketTab, false)}
+                  </div>
                 </div>
+
+                {/* Multi-Ticket Grand Total Summary */}
+                {lineItems.length > 1 && (
+                  <div className="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/60 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs font-semibold">
+                    <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                      <Layers className="h-4 w-4" />
+                      <span>Combined Invoice: <strong>{lineItems.length} Passenger Tickets</strong></span>
+                    </div>
+                    <div className="flex items-center gap-4 font-mono">
+                      <span>Grand Total Due: <strong className="text-primary text-sm">PKR {lineItems.reduce((sum, item) => sum + (item.customer_net || 0), 0).toLocaleString()}</strong></span>
+                      <span>Total Agency Margin: <strong className="text-blue-600 dark:text-blue-400">PKR {lineItems.reduce((sum, item) => sum + (item.agency_margin || 0), 0).toLocaleString()}</strong></span>
+                    </div>
+                  </div>
+                )}
+              </div>
               ) : (
                 /* Non-ticket Line Items */
                 lineItems.map((li, idx) => (
@@ -2097,7 +2145,6 @@ export default function InvoicesPage() {
                   {isCreating ? "Saving..." : "Save Invoice"}
                 </Button>
               </div>
-            </div>
           </CardContent>
         </Card>
       )}
@@ -2392,7 +2439,7 @@ export default function InvoicesPage() {
           ) : (
             <div className="space-y-3.5 pt-1">
               {/* Top Header Grid for Edit Modal — Single Row */}
-              <div className="p-3 bg-slate-100/70 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-800 text-[12px]">
+              <div className="p-3 bg-slate-100/70 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-800 text-[12px] mb-4">
                 <div className="grid gap-2" style={{ gridTemplateColumns: "120px 120px 1fr 1fr 130px 110px 110px 100px 1fr" }}>
                   <div className="space-y-1">
                     <Label className="text-[11px] font-semibold">Inv. Date</Label>
@@ -2479,58 +2526,105 @@ export default function InvoicesPage() {
                 </div>
               </div>
 
-              {/* Multi-Ticket Tabs & Form (Edit Dialog) */}
+              {/* Multi-Ticket Vertical Sidebar & Form (Edit) */}
               {editLineItems[0]?.service_type === "Ticket" ? (
                 <div className="space-y-3">
-                  {/* Tabs Bar */}
-                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 border-b border-slate-200 dark:border-slate-800">
-                    {editLineItems.map((li, idx) => (
-                      <div key={idx} className="flex items-center">
-                        <button
+                  <div className="flex flex-col md:flex-row gap-3 items-start">
+                    {/* Left Sidebar List of Tickets */}
+                    <div className="w-full md:w-52 flex-shrink-0 bg-slate-50 dark:bg-slate-900/60 p-2 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2">
+                      <div className="flex items-center justify-between px-2 py-1 border-b border-slate-200 dark:border-slate-800">
+                        <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                          <Plane className="h-3.5 w-3.5 text-primary" /> Tickets ({editLineItems.length})
+                        </span>
+                        <Button
                           type="button"
-                          onClick={() => setActiveEditTicketTab(idx)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
-                            activeEditTicketTab === idx
-                              ? "bg-primary text-primary-foreground shadow-sm"
-                              : "bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300"
-                          }`}
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-800"
+                          title="Add Ticket"
+                          onClick={() => {
+                            const newTicket = createDefaultTicketItem();
+                            setEditLineItems((prev) => [...prev, newTicket]);
+                            setActiveEditTicketTab(editLineItems.length);
+                          }}
                         >
-                          <Plane className="h-3.5 w-3.5" />
-                          <span>{li.pax_name ? li.pax_name.slice(0, 18) : `Ticket ${idx + 1}`}</span>
-                        </button>
-                        {editLineItems.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const updated = editLineItems.filter((_, i) => i !== idx);
-                              setEditLineItems(updated);
-                              if (activeEditTicketTab >= updated.length) setActiveEditTicketTab(Math.max(0, updated.length - 1));
-                            }}
-                            className="p-1 text-slate-400 hover:text-red-500 ml-0.5"
-                            title="Remove this ticket"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        )}
+                          <Plus className="h-3.5 w-3.5" />
+                        </Button>
                       </div>
-                    ))}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-7 text-xs px-2.5 gap-1 border-dashed"
-                      onClick={() => {
-                        const newTicket = createDefaultTicketItem();
-                        setEditLineItems((prev) => [...prev, newTicket]);
-                        setActiveEditTicketTab(editLineItems.length);
-                      }}
-                    >
-                      <Plus className="h-3 w-3" /> Add Ticket
-                    </Button>
-                  </div>
 
-                  {/* Active Ticket Form */}
-                  {renderTicketForm(editLineItems[activeEditTicketTab] || editLineItems[0], activeEditTicketTab, true)}
+                      <div className="space-y-1.5 max-h-[550px] overflow-y-auto pr-0.5">
+                        {editLineItems.map((li, idx) => {
+                          const isSelected = activeEditTicketTab === idx;
+                          const paxName = li.pax_name || `Ticket ${idx + 1}`;
+                          const tktNum = li.ticket_number || "";
+                          return (
+                            <div
+                              key={idx}
+                              onClick={() => setActiveEditTicketTab(idx)}
+                              className={`group relative flex items-center justify-between p-2 rounded-lg text-xs font-medium cursor-pointer transition-all border ${
+                                isSelected
+                                  ? "bg-primary text-primary-foreground border-primary shadow-sm font-semibold"
+                                  : "bg-[#161619] bg-white hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200/80 dark:border-slate-800"
+                              }`}
+                            >
+                              <div className="flex items-center gap-2 min-w-0 flex-1">
+                                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
+                                  isSelected ? "bg-white/20 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
+                                }`}>
+                                  {idx + 1}
+                                </span>
+                                <div className="truncate min-w-0">
+                                  <p className="truncate text-[11.5px] leading-tight font-bold">{paxName}</p>
+                                  {tktNum && (
+                                    <p className={`text-[9.5px] truncate font-mono mt-0.5 ${isSelected ? "text-primary-foreground/80" : "text-slate-400"}`}>
+                                      {tktNum}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+
+                              {editLineItems.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const updated = editLineItems.filter((_, i) => i !== idx);
+                                    setEditLineItems(updated);
+                                    if (activeEditTicketTab >= updated.length) setActiveEditTicketTab(Math.max(0, updated.length - 1));
+                                  }}
+                                  className={`p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity ${
+                                    isSelected ? "hover:bg-white/20 text-white" : "hover:bg-red-100 dark:hover:bg-red-950/50 text-slate-400 hover:text-red-600"
+                                  }`}
+                                  title="Delete ticket"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="w-full h-8 text-xs gap-1.5 border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-[#161619] hover:bg-primary/5 hover:border-primary"
+                        onClick={() => {
+                          const newTicket = createDefaultTicketItem();
+                          setEditLineItems((prev) => [...prev, newTicket]);
+                          setActiveEditTicketTab(editLineItems.length);
+                        }}
+                      >
+                        <Plus className="h-3.5 w-3.5" /> Add Ticket
+                      </Button>
+                    </div>
+
+                    {/* Right Active Ticket Form */}
+                    <div className="flex-1 min-w-0 w-full">
+                      {renderTicketForm(editLineItems[activeEditTicketTab] || editLineItems[0], activeEditTicketTab, true)}
+                    </div>
+                  </div>
 
                   {/* Multi-Ticket Grand Total Summary */}
                   {editLineItems.length > 1 && (
