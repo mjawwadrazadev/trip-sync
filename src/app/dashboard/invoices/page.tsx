@@ -1176,23 +1176,14 @@ export default function InvoicesPage() {
                 <span>Conjunction Ticket (6th Leg / Extended Routing)</span>
                 <span className="text-[10px] text-slate-400 font-normal">Full secondary leg data</span>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div>
                 <div className="space-y-1">
                   <Label className="text-[10px] text-slate-500 font-semibold">Conjunction Ticket No. (3-4-3-3)</Label>
                   <Input
                     placeholder="000-0000-000-000"
                     value={item.conjunction_ticket_no || ""}
                     onChange={(e) => updateTicketLineItem(itemIdx, "conjunction_ticket_no", e.target.value, isEdit)}
-                    className="h-7 text-[11px] font-mono bg-white dark:bg-[#161619]"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-slate-500 font-semibold">Route Details</Label>
-                  <Input
-                    placeholder="ORG-DST-DST"
-                    value={item.conjunction_route || ""}
-                    onChange={(e) => updateTicketLineItem(itemIdx, "conjunction_route", e.target.value.toUpperCase(), isEdit)}
-                    className="h-7 text-[11px] font-mono uppercase bg-white dark:bg-[#161619]"
+                    className="h-7 text-[11px] font-mono bg-white dark:bg-[#161619] max-w-xs"
                   />
                 </div>
               </div>
