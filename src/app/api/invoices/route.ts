@@ -155,7 +155,7 @@ export async function POST(req: NextRequest) {
   return withAuth(async (user) => {
     const body = await req.json();
     const {
-      customer_id, currency, line_items, bsp_flag, bsp_billing_period,
+      customer_id, currency, line_items, status, bsp_flag, bsp_billing_period,
       payment_mode, remarks, internal_remarks, customer_remarks, visit_type, spo_id, supplier_id,
       print_name, cost_center, adj_date, our_xo, client_xo,
     } = body;
@@ -225,12 +225,13 @@ export async function POST(req: NextRequest) {
     }
 
     const invoice_number = `${tenant.invoice_prefix}-${String(nextNum).padStart(6, "0")}`;
+    const finalStatus = status === "Confirmed" ? "Posted" : status || "Draft";
 
     const invoice = await Invoice.create({
       tenant_id: user.tenant_id,
       customer_id,
       invoice_number,
-      status: "Draft",
+      status: finalStatus,
       currency: currency || tenant.base_currency,
       total_amount,
       bsp_flag: bsp_flag || false,
@@ -250,6 +251,13 @@ export async function POST(req: NextRequest) {
       created_by: user.user_id,
       updated_by: user.user_id,
     });
+
+    if (finalStatus === "Posted" || finalStatus === "Confirmed") {
+      await Customer.updateOne(
+        { _id: customer_id, tenant_id: user.tenant_id },
+        { $inc: { current_balance: total_amount } }
+      );
+    }
 
     // Create line items
     const lineItemDocs = await InvoiceLineItem.insertMany(

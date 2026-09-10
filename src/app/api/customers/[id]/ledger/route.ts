@@ -28,7 +28,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     // Calculate dynamic self-healing balance
     const totalInvoiced = invoices
-      .filter((inv) => inv.status === "Posted")
+      .filter((inv) => inv.status === "Posted" || inv.status === "Confirmed")
       .reduce((sum, inv) => sum + inv.total_amount, 0);
     const totalAllocated = allocations.reduce((sum, a) => sum + a.allocated_amount, 0);
     const totalCredits = creditNotes
@@ -48,7 +48,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         type: "invoice" as const,
         date: inv.created_at,
         reference: inv.invoice_number,
-        debit: inv.status === "Posted" ? inv.total_amount : 0,
+        debit: (inv.status === "Posted" || inv.status === "Confirmed") ? inv.total_amount : 0,
         credit: 0,
         status: inv.status,
       })),
