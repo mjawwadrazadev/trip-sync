@@ -14,7 +14,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Textarea } from "@/components/ui/textarea";
 import {
   Plus, Send, Ban, CreditCard, Trash2, History, Loader2, Pencil,
-  Printer, Plane, FileText, Calculator, Search, X, RotateCcw, AlertTriangle, Check, Layers
+  Printer, Plane, FileText, Calculator, Search, X, RotateCcw, AlertTriangle, Check, Layers,
+  ArrowLeft, Copy, CheckCircle2, Save
 } from "lucide-react";
 import { CITY_AIRPORT_CODES, formatTicketNumber, getAirlineByTicketNumber } from "@/lib/iataAirlines";
 
@@ -1844,6 +1845,7 @@ export default function InvoicesPage() {
   };
 
   const hasActiveFilters = searchQuery || dateRangeFilter !== "all" || paymentStatusFilter !== "all" || statusFilter !== "all" || customerFilter !== "all";
+  const isFormView = showNew || !!editInvoiceId;
 
   return (
     <div>
@@ -1856,28 +1858,153 @@ export default function InvoicesPage() {
         ))}
       </datalist>
 
-      {/* Page Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-50">
-            Invoices{typeFilter ? ` — ${typeFilter}s` : ""}
-          </h1>
-          <p className="text-[13px] text-gray-500 dark:text-gray-400 mt-1">Manage ticket sales, airline billing, and travel invoices</p>
-        </div>
-        <Button
-          onClick={() => {
-            if (editInvoiceId) setEditInvoiceId(null);
-            setShowNew(!showNew);
-          }}
-          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-[13px] font-medium text-primary-foreground hover:bg-primary/90 shadow-sm transition-colors cursor-pointer"
-        >
-          {showNew ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-          {showNew ? "Close Form" : "New Invoice / Ticket Sale"}
-        </Button>
-      </div>
+      {isFormView ? (
+        /* Create / Edit Invoice View */
+        <div className="space-y-4">
+          {/* Top Action & Navigation Toolbar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-white dark:bg-[#111113] border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm">
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setShowNew(false);
+                  setEditInvoiceId(null);
+                }}
+                className="h-8 gap-1.5 text-xs font-semibold cursor-pointer border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <ArrowLeft className="h-4 w-4" /> Back to Invoices
+              </Button>
+              <div className="h-4 w-[1px] bg-slate-300 dark:bg-slate-700 hidden sm:block" />
+              <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                {editInvoiceId ? (
+                  <>
+                    <Pencil className="h-4 w-4 text-primary" />
+                    Editing Invoice #{invoices.find((i) => i._id === editInvoiceId)?.invoice_number || "..."}
+                  </>
+                ) : (
+                  <>
+                    <FileText className="h-4 w-4 text-primary" />
+                    New Ticket Sales Invoice
+                  </>
+                )}
+              </h2>
+            </div>
 
-      {/* Inline Create Invoice Form Card */}
-      {showNew && (
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs gap-1.5 border-slate-300 dark:border-slate-700 bg-white dark:bg-[#161619]"
+                onClick={() => {
+                  setEditInvoiceId(null);
+                  setShowNew(true);
+                  setLineItems([createDefaultTicketItem()]);
+                  setActiveTicketTab(0);
+                }}
+              >
+                <Plus className="h-3.5 w-3.5 text-slate-600 dark:text-slate-400" /> New Invoice
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs gap-1.5 border-slate-300 dark:border-slate-700 bg-white dark:bg-[#161619]"
+                onClick={() => {
+                  if (editInvoiceId) {
+                    setLineItems(JSON.parse(JSON.stringify(editLineItems)));
+                    setNewCustomerId(editCustomerId);
+                    setNewPrintName(editPrintName);
+                    setNewSpoId(editSpoId);
+                    setNewVisitType(editVisitType);
+                    setNewPaymentMode(editPaymentMode);
+                    setNewDocStatus("Draft");
+                    setNewInternalRemarks(editInternalRemarks);
+                    setEditInvoiceId(null);
+                    setShowNew(true);
+                  } else {
+                    const copyItems = JSON.parse(JSON.stringify(lineItems));
+                    setLineItems((prev) => [...prev, ...copyItems]);
+                  }
+                }}
+              >
+                <Copy className="h-3.5 w-3.5 text-blue-600" /> Copy Full Inv
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs gap-1.5 border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-950/30 hover:bg-emerald-100"
+                onClick={() => {
+                  if (editInvoiceId) {
+                    setEditDocStatus("Confirmed");
+                    saveEditInvoice();
+                  } else {
+                    setNewDocStatus("Confirmed");
+                    createInvoice();
+                  }
+                }}
+              >
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> Post
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs gap-1.5 border-slate-300 dark:border-slate-700 bg-white dark:bg-[#161619]"
+                onClick={() => {
+                  if (editInvoiceId) {
+                    window.open(`/dashboard/invoices/${editInvoiceId}/print`, "_blank");
+                  } else {
+                    window.print();
+                  }
+                }}
+              >
+                <Printer className="h-3.5 w-3.5 text-purple-600" /> Print
+              </Button>
+
+              <Button
+                type="button"
+                size="sm"
+                className="h-8 text-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 font-medium"
+                onClick={() => {
+                  if (editInvoiceId) {
+                    saveEditInvoice();
+                  } else {
+                    createInvoice();
+                  }
+                }}
+                disabled={editInvoiceId ? isSavingEdit : isCreating}
+              >
+                {(editInvoiceId ? isSavingEdit : isCreating) ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Save className="h-3.5 w-3.5" />
+                )}
+                {(editInvoiceId ? isSavingEdit : isCreating) ? "Saving..." : "Save Invoice"}
+              </Button>
+
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setShowNew(false);
+                  setEditInvoiceId(null);
+                }}
+                className="h-8 w-8 p-0 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          {/* Inline Create Invoice Form Card */}
+          {showNew && (
         <Card className="mb-6 border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111113] shadow-md">
           <CardHeader className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex flex-row items-center justify-between">
             <CardTitle className="text-base font-bold flex items-center gap-2">
@@ -2149,8 +2276,279 @@ export default function InvoicesPage() {
         </Card>
       )}
 
-      {/* Modern Search & Filters Bar */}
-      <Card className="bg-white dark:bg-[#111113] border-gray-200/80 dark:border-[#1e1e21] shadow-sm mb-5">
+          {/* Inline Edit Invoice Form Card */}
+          {!!editInvoiceId && (
+            <Card className="mb-6 border-blue-300 dark:border-blue-800/80 bg-white dark:bg-[#111113] shadow-lg">
+              <CardHeader className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex flex-row items-center justify-between bg-blue-50/50 dark:bg-blue-950/20">
+                <CardTitle className="text-base font-bold flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                  <Pencil className="h-5 w-5 text-primary" /> Edit Ticket Invoice
+                </CardTitle>
+                <Button variant="ghost" size="sm" onClick={() => setEditInvoiceId(null)} className="h-8 w-8 p-0">
+                  <X className="h-4 w-4" />
+                </Button>
+              </CardHeader>
+              <CardContent className="p-5">
+              {editLoading ? (
+                <div className="flex items-center justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+              ) : (
+                <div className="space-y-3.5 pt-1">
+                  {/* Top Header Grid for Edit Modal — Single Row */}
+                  <div className="p-3 bg-slate-100/70 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-800 text-[12px] mb-4">
+                    <div className="grid gap-2" style={{ gridTemplateColumns: "120px 120px 1fr 1fr 130px 110px 110px 100px 1fr" }}>
+                      <div className="space-y-1">
+                        <Label className="text-[11px] font-semibold">Inv. Date</Label>
+                        <Input type="date" value={editAdjDate} onChange={(e) => setEditAdjDate(e.target.value)} className="h-8 text-[11px] bg-white dark:bg-[#161619] px-1.5" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[11px] font-semibold">Adj. Date</Label>
+                        <Input type="date" value={editAdjDate} onChange={(e) => setEditAdjDate(e.target.value)} className="h-8 text-[11px] bg-white dark:bg-[#161619] px-1.5" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[11px] font-semibold">Customer *</Label>
+                        <Select value={editCustomerId} onValueChange={(v) => setEditCustomerId(v || "")}>
+                          <SelectTrigger className="h-8 text-[11px] bg-white dark:bg-[#161619]">
+                            <SelectValue placeholder="Select Customer">
+                              {(val) => getCustomerName(val)}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>{customers.map((c) => <SelectItem key={c._id} value={c._id}>{c.name}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[11px] font-semibold">Print Name *</Label>
+                        <Input value={editPrintName} onChange={(e) => setEditPrintName(e.target.value)} className="h-8 text-[11px] bg-white dark:bg-[#161619]" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[11px] font-semibold">SPO / Agent</Label>
+                        <Select value={editSpoId} onValueChange={(v) => setEditSpoId(v || "")}>
+                          <SelectTrigger className="h-8 text-[11px] bg-white dark:bg-[#161619]">
+                            <SelectValue placeholder="Agent">
+                              {(val) => getAgentName(val)}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>{staffUsers.map((u) => <SelectItem key={u._id} value={u._id}>{u.name} ({u.role})</SelectItem>)}</SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[11px] font-semibold">Visit Type *</Label>
+                        <Select value={editVisitType} onValueChange={(v) => setEditVisitType(v || "Visitor")}>
+                          <SelectTrigger className="h-8 text-[11px] bg-white dark:bg-[#161619]"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Visitor">Visitor</SelectItem>
+                            <SelectItem value="Corporate">Corporate</SelectItem>
+                            <SelectItem value="Government">Government</SelectItem>
+                            <SelectItem value="Walk-in">Walk-in</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[11px] font-semibold">Pay. Mode *</Label>
+                        <Select value={editPaymentMode} onValueChange={(v) => setEditPaymentMode(v || "CR")}>
+                          <SelectTrigger className="h-8 text-[11px] bg-white dark:bg-[#161619]">
+                            <SelectValue>{(val) => val === "CR" ? "CR" : val || "CR"}</SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="CR">CR (Credit)</SelectItem>
+                            <SelectItem value="Cash">Cash</SelectItem>
+                            <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                            <SelectItem value="Cheque">Cheque</SelectItem>
+                            <SelectItem value="Card">Card</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[11px] font-semibold">Status *</Label>
+                        <Select value={editDocStatus} onValueChange={(v) => setEditDocStatus(v || "Draft")}>
+                          <SelectTrigger className="h-8 text-[11px] bg-white dark:bg-[#161619]">
+                            <SelectValue>{(val) => val === "Draft" ? "Draft (D)" : "Conf (C)"}</SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Draft">Draft (D)</SelectItem>
+                            <SelectItem value="Confirmed">Confirmed (C)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[11px] font-semibold">Internal Remarks</Label>
+                        <Input
+                          placeholder="Internal notes..."
+                          value={editInternalRemarks}
+                          onChange={(e) => setEditInternalRemarks(e.target.value)}
+                          className="h-8 text-[11px] bg-white dark:bg-[#161619]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Multi-Ticket Vertical Sidebar & Form (Edit) */}
+                  {editLineItems[0]?.service_type === "Ticket" ? (
+                    <div className="space-y-3">
+                      <div className="flex flex-col md:flex-row gap-3 items-start">
+                        {/* Left Sidebar List of Tickets */}
+                        <div className="w-full md:w-52 flex-shrink-0 bg-slate-50 dark:bg-slate-900/60 p-2 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2">
+                          <div className="flex items-center justify-between px-2 py-1 border-b border-slate-200 dark:border-slate-800">
+                            <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                              <Plane className="h-3.5 w-3.5 text-primary" /> Tickets ({editLineItems.length})
+                            </span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-800"
+                              title="Add Ticket"
+                              onClick={() => {
+                                const newTicket = createDefaultTicketItem();
+                                setEditLineItems((prev) => [...prev, newTicket]);
+                                setActiveEditTicketTab(editLineItems.length);
+                              }}
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+
+                          <div className="space-y-1.5 max-h-[550px] overflow-y-auto pr-0.5">
+                            {editLineItems.map((li, idx) => {
+                              const isSelected = activeEditTicketTab === idx;
+                              const paxName = li.pax_name || `Ticket ${idx + 1}`;
+                              const tktNum = li.ticket_number || "";
+                              return (
+                                <div
+                                  key={idx}
+                                  onClick={() => setActiveEditTicketTab(idx)}
+                                  className={`group relative flex items-center justify-between p-2 rounded-lg text-xs font-medium cursor-pointer transition-all border ${
+                                    isSelected
+                                      ? "bg-primary text-primary-foreground border-primary shadow-sm font-semibold"
+                                      : "bg-[#161619] bg-white hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200/80 dark:border-slate-800"
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
+                                      isSelected ? "bg-white/20 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
+                                    }`}>
+                                      {idx + 1}
+                                    </span>
+                                    <div className="truncate min-w-0">
+                                      <p className="truncate text-[11.5px] leading-tight font-bold">{paxName}</p>
+                                      {tktNum && (
+                                        <p className={`text-[9.5px] truncate font-mono mt-0.5 ${isSelected ? "text-primary-foreground/80" : "text-slate-400"}`}>
+                                          {tktNum}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {editLineItems.length > 1 && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const updated = editLineItems.filter((_, i) => i !== idx);
+                                        setEditLineItems(updated);
+                                        if (activeEditTicketTab >= updated.length) setActiveEditTicketTab(Math.max(0, updated.length - 1));
+                                      }}
+                                      className={`p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity ${
+                                        isSelected ? "hover:bg-white/20 text-white" : "hover:bg-red-100 dark:hover:bg-red-950/50 text-slate-400 hover:text-red-600"
+                                      }`}
+                                      title="Delete ticket"
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="w-full h-8 text-xs gap-1.5 border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-[#161619] hover:bg-primary/5 hover:border-primary"
+                            onClick={() => {
+                              const newTicket = createDefaultTicketItem();
+                              setEditLineItems((prev) => [...prev, newTicket]);
+                              setActiveEditTicketTab(editLineItems.length);
+                            }}
+                          >
+                            <Plus className="h-3.5 w-3.5" /> Add Ticket
+                          </Button>
+                        </div>
+
+                        {/* Right Active Ticket Form */}
+                        <div className="flex-1 min-w-0 w-full">
+                          {renderTicketForm(editLineItems[activeEditTicketTab] || editLineItems[0], activeEditTicketTab, true)}
+                        </div>
+                      </div>
+
+                      {/* Multi-Ticket Grand Total Summary */}
+                      {editLineItems.length > 1 && (
+                        <div className="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/60 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs font-semibold">
+                          <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                            <Layers className="h-4 w-4" />
+                            <span>Combined Invoice: <strong>{editLineItems.length} Passenger Tickets</strong></span>
+                          </div>
+                          <div className="flex items-center gap-4 font-mono">
+                            <span>Grand Total Due: <strong className="text-primary text-sm">PKR {editLineItems.reduce((sum, item) => sum + (item.customer_net || 0), 0).toLocaleString()}</strong></span>
+                            <span>Total Agency Margin: <strong className="text-blue-600 dark:text-blue-400">PKR {editLineItems.reduce((sum, item) => sum + (item.agency_margin || 0), 0).toLocaleString()}</strong></span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    /* Non-ticket Line Items */
+                    editLineItems.map((li, idx) => (
+                      <div key={idx} className="p-4 rounded-xl border border-gray-200 dark:border-gray-800 space-y-3 bg-gray-50/50">
+                        <Input
+                          placeholder="Description"
+                          value={li.description}
+                          onChange={(e) => {
+                            const arr = [...editLineItems];
+                            arr[idx].description = e.target.value;
+                            setEditLineItems(arr);
+                          }}
+                          className="h-9 text-[13px]"
+                        />
+                      </div>
+                    ))
+                  )}
+
+                  <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                    <Button variant="outline" onClick={() => setEditInvoiceId(null)}>Cancel</Button>
+                    <Button onClick={saveEditInvoice} disabled={isSavingEdit} className="gap-2">
+                      {isSavingEdit ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                      {isSavingEdit ? "Saving..." : "Save Changes"}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+        </div>
+      ) : (
+        /* Invoices List View */
+        <div className="space-y-5">
+          {/* Page Header */}
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-50">
+                Invoices{typeFilter ? ` — ${typeFilter}s` : ""}
+              </h1>
+              <p className="text-[13px] text-gray-500 dark:text-gray-400 mt-1">Manage ticket sales, airline billing, and travel invoices</p>
+            </div>
+            <Button
+              onClick={() => {
+                setEditInvoiceId(null);
+                setShowNew(true);
+              }}
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-[13px] font-medium text-primary-foreground hover:bg-primary/90 shadow-sm transition-colors cursor-pointer"
+            >
+              <Plus className="h-4 w-4" /> New Invoice / Ticket Sale
+            </Button>
+          </div>
+
+          {/* Modern Search & Filters Bar */}
+          <Card className="bg-white dark:bg-[#111113] border-gray-200/80 dark:border-[#1e1e21] shadow-sm mb-5">
         <CardContent className="p-4">
           <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
             {/* Search Input */}
@@ -2421,255 +2819,8 @@ export default function InvoicesPage() {
           )}
         </CardContent>
       </Card>
-
-      {/* Inline Edit Invoice Form Card */}
-      {!!editInvoiceId && (
-        <Card className="mb-6 border-blue-300 dark:border-blue-800/80 bg-white dark:bg-[#111113] shadow-lg">
-          <CardHeader className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex flex-row items-center justify-between bg-blue-50/50 dark:bg-blue-950/20">
-            <CardTitle className="text-base font-bold flex items-center gap-2 text-blue-700 dark:text-blue-300">
-              <Pencil className="h-5 w-5 text-primary" /> Edit Ticket Invoice
-            </CardTitle>
-            <Button variant="ghost" size="sm" onClick={() => setEditInvoiceId(null)} className="h-8 w-8 p-0">
-              <X className="h-4 w-4" />
-            </Button>
-          </CardHeader>
-          <CardContent className="p-5">
-          {editLoading ? (
-            <div className="flex items-center justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
-          ) : (
-            <div className="space-y-3.5 pt-1">
-              {/* Top Header Grid for Edit Modal — Single Row */}
-              <div className="p-3 bg-slate-100/70 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-800 text-[12px] mb-4">
-                <div className="grid gap-2" style={{ gridTemplateColumns: "120px 120px 1fr 1fr 130px 110px 110px 100px 1fr" }}>
-                  <div className="space-y-1">
-                    <Label className="text-[11px] font-semibold">Inv. Date</Label>
-                    <Input type="date" value={editAdjDate} onChange={(e) => setEditAdjDate(e.target.value)} className="h-8 text-[11px] bg-white dark:bg-[#161619] px-1.5" />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[11px] font-semibold">Adj. Date</Label>
-                    <Input type="date" value={editAdjDate} onChange={(e) => setEditAdjDate(e.target.value)} className="h-8 text-[11px] bg-white dark:bg-[#161619] px-1.5" />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[11px] font-semibold">Customer *</Label>
-                    <Select value={editCustomerId} onValueChange={(v) => setEditCustomerId(v || "")}>
-                      <SelectTrigger className="h-8 text-[11px] bg-white dark:bg-[#161619]">
-                        <SelectValue placeholder="Select Customer">
-                          {(val) => getCustomerName(val)}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>{customers.map((c) => <SelectItem key={c._id} value={c._id}>{c.name}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[11px] font-semibold">Print Name *</Label>
-                    <Input value={editPrintName} onChange={(e) => setEditPrintName(e.target.value)} className="h-8 text-[11px] bg-white dark:bg-[#161619]" />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[11px] font-semibold">SPO / Agent</Label>
-                    <Select value={editSpoId} onValueChange={(v) => setEditSpoId(v || "")}>
-                      <SelectTrigger className="h-8 text-[11px] bg-white dark:bg-[#161619]">
-                        <SelectValue placeholder="Agent">
-                          {(val) => getAgentName(val)}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>{staffUsers.map((u) => <SelectItem key={u._id} value={u._id}>{u.name} ({u.role})</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[11px] font-semibold">Visit Type *</Label>
-                    <Select value={editVisitType} onValueChange={(v) => setEditVisitType(v || "Visitor")}>
-                      <SelectTrigger className="h-8 text-[11px] bg-white dark:bg-[#161619]"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Visitor">Visitor</SelectItem>
-                        <SelectItem value="Corporate">Corporate</SelectItem>
-                        <SelectItem value="Government">Government</SelectItem>
-                        <SelectItem value="Walk-in">Walk-in</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[11px] font-semibold">Pay. Mode *</Label>
-                    <Select value={editPaymentMode} onValueChange={(v) => setEditPaymentMode(v || "CR")}>
-                      <SelectTrigger className="h-8 text-[11px] bg-white dark:bg-[#161619]">
-                        <SelectValue>{(val) => val === "CR" ? "CR" : val || "CR"}</SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="CR">CR (Credit)</SelectItem>
-                        <SelectItem value="Cash">Cash</SelectItem>
-                        <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-                        <SelectItem value="Cheque">Cheque</SelectItem>
-                        <SelectItem value="Card">Card</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[11px] font-semibold">Status *</Label>
-                    <Select value={editDocStatus} onValueChange={(v) => setEditDocStatus(v || "Draft")}>
-                      <SelectTrigger className="h-8 text-[11px] bg-white dark:bg-[#161619]">
-                        <SelectValue>{(val) => val === "Draft" ? "Draft (D)" : "Conf (C)"}</SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Draft">Draft (D)</SelectItem>
-                        <SelectItem value="Confirmed">Confirmed (C)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[11px] font-semibold">Internal Remarks</Label>
-                    <Input
-                      placeholder="Internal notes..."
-                      value={editInternalRemarks}
-                      onChange={(e) => setEditInternalRemarks(e.target.value)}
-                      className="h-8 text-[11px] bg-white dark:bg-[#161619]"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Multi-Ticket Vertical Sidebar & Form (Edit) */}
-              {editLineItems[0]?.service_type === "Ticket" ? (
-                <div className="space-y-3">
-                  <div className="flex flex-col md:flex-row gap-3 items-start">
-                    {/* Left Sidebar List of Tickets */}
-                    <div className="w-full md:w-52 flex-shrink-0 bg-slate-50 dark:bg-slate-900/60 p-2 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2">
-                      <div className="flex items-center justify-between px-2 py-1 border-b border-slate-200 dark:border-slate-800">
-                        <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                          <Plane className="h-3.5 w-3.5 text-primary" /> Tickets ({editLineItems.length})
-                        </span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-800"
-                          title="Add Ticket"
-                          onClick={() => {
-                            const newTicket = createDefaultTicketItem();
-                            setEditLineItems((prev) => [...prev, newTicket]);
-                            setActiveEditTicketTab(editLineItems.length);
-                          }}
-                        >
-                          <Plus className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-
-                      <div className="space-y-1.5 max-h-[550px] overflow-y-auto pr-0.5">
-                        {editLineItems.map((li, idx) => {
-                          const isSelected = activeEditTicketTab === idx;
-                          const paxName = li.pax_name || `Ticket ${idx + 1}`;
-                          const tktNum = li.ticket_number || "";
-                          return (
-                            <div
-                              key={idx}
-                              onClick={() => setActiveEditTicketTab(idx)}
-                              className={`group relative flex items-center justify-between p-2 rounded-lg text-xs font-medium cursor-pointer transition-all border ${
-                                isSelected
-                                  ? "bg-primary text-primary-foreground border-primary shadow-sm font-semibold"
-                                  : "bg-[#161619] bg-white hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200/80 dark:border-slate-800"
-                              }`}
-                            >
-                              <div className="flex items-center gap-2 min-w-0 flex-1">
-                                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
-                                  isSelected ? "bg-white/20 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
-                                }`}>
-                                  {idx + 1}
-                                </span>
-                                <div className="truncate min-w-0">
-                                  <p className="truncate text-[11.5px] leading-tight font-bold">{paxName}</p>
-                                  {tktNum && (
-                                    <p className={`text-[9.5px] truncate font-mono mt-0.5 ${isSelected ? "text-primary-foreground/80" : "text-slate-400"}`}>
-                                      {tktNum}
-                                    </p>
-                                  )}
-                                </div>
-                              </div>
-
-                              {editLineItems.length > 1 && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    const updated = editLineItems.filter((_, i) => i !== idx);
-                                    setEditLineItems(updated);
-                                    if (activeEditTicketTab >= updated.length) setActiveEditTicketTab(Math.max(0, updated.length - 1));
-                                  }}
-                                  className={`p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity ${
-                                    isSelected ? "hover:bg-white/20 text-white" : "hover:bg-red-100 dark:hover:bg-red-950/50 text-slate-400 hover:text-red-600"
-                                  }`}
-                                  title="Delete ticket"
-                                >
-                                  <X className="h-3 w-3" />
-                                </button>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="w-full h-8 text-xs gap-1.5 border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-[#161619] hover:bg-primary/5 hover:border-primary"
-                        onClick={() => {
-                          const newTicket = createDefaultTicketItem();
-                          setEditLineItems((prev) => [...prev, newTicket]);
-                          setActiveEditTicketTab(editLineItems.length);
-                        }}
-                      >
-                        <Plus className="h-3.5 w-3.5" /> Add Ticket
-                      </Button>
-                    </div>
-
-                    {/* Right Active Ticket Form */}
-                    <div className="flex-1 min-w-0 w-full">
-                      {renderTicketForm(editLineItems[activeEditTicketTab] || editLineItems[0], activeEditTicketTab, true)}
-                    </div>
-                  </div>
-
-                  {/* Multi-Ticket Grand Total Summary */}
-                  {editLineItems.length > 1 && (
-                    <div className="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/60 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs font-semibold">
-                      <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
-                        <Layers className="h-4 w-4" />
-                        <span>Combined Invoice: <strong>{editLineItems.length} Passenger Tickets</strong></span>
-                      </div>
-                      <div className="flex items-center gap-4 font-mono">
-                        <span>Grand Total Due: <strong className="text-primary text-sm">PKR {editLineItems.reduce((sum, item) => sum + (item.customer_net || 0), 0).toLocaleString()}</strong></span>
-                        <span>Total Agency Margin: <strong className="text-blue-600 dark:text-blue-400">PKR {editLineItems.reduce((sum, item) => sum + (item.agency_margin || 0), 0).toLocaleString()}</strong></span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                /* Non-ticket Line Items */
-                editLineItems.map((li, idx) => (
-                  <div key={idx} className="p-4 rounded-xl border border-gray-200 dark:border-gray-800 space-y-3 bg-gray-50/50">
-                    <Input
-                      placeholder="Description"
-                      value={li.description}
-                      onChange={(e) => {
-                        const arr = [...editLineItems];
-                        arr[idx].description = e.target.value;
-                        setEditLineItems(arr);
-                      }}
-                      className="h-9 text-[13px]"
-                    />
-                  </div>
-                ))
-              )}
-
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
-                <Button variant="outline" onClick={() => setEditInvoiceId(null)}>Cancel</Button>
-                <Button onClick={saveEditInvoice} disabled={isSavingEdit} className="gap-2">
-                  {isSavingEdit ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                  {isSavingEdit ? "Saving..." : "Save Changes"}
-                </Button>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    )}
+        </div>
+      )}
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={!!deleteInvoiceId} onOpenChange={() => setDeleteInvoiceId(null)}>
