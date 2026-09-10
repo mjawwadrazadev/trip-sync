@@ -154,6 +154,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   if (!session) return null;
 
+  if (pathname.includes("/print")) {
+    return <>{children}</>;
+  }
+
   const user = session.user;
   const initials = user.name?.split(" ").map((n) => n[0]).join("") || "U";
 
