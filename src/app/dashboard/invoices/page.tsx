@@ -452,8 +452,18 @@ export default function InvoicesPage() {
 
     let taxes = 0;
     if (item.trip_type === "Domestic") {
-      // Domestic Taxes
-      taxes = (parseFloat(item.tax_ced || "0") || 0) +
+      // Domestic Fixed Taxes (SP, CED, PK, YR, PB, YQ, DOF, XZ, YD, YI, RN, etc.)
+      taxes = (parseFloat(item.tax_sp || "0") || 0) +
+        (parseFloat(item.tax_ced || "0") || 0) +
+        (parseFloat(item.tax_pk || "0") || 0) +
+        (parseFloat(item.tax_yr || "0") || 0) +
+        (parseFloat(item.tax_pb || "0") || 0) +
+        (parseFloat(item.tax_yq || "0") || 0) +
+        (parseFloat(item.tax_dof || "0") || 0) +
+        (parseFloat(item.tax_xz || "0") || 0) +
+        (parseFloat(item.tax_yd || "0") || 0) +
+        (parseFloat(item.tax_yi || "0") || 0) +
+        (parseFloat(item.tax_rn || "0") || 0) +
         (parseFloat(item.tax_gst_dom || "0") || 0) +
         (parseFloat(item.tax_ast || "0") || 0) +
         (parseFloat(item.tax_apt || "0") || 0) +
@@ -1375,71 +1385,129 @@ export default function InvoicesPage() {
             {/* Middle: International Taxes OR Domestic Taxes based on Type Selection */}
             <div className="space-y-3">
               {isDomestic ? (
-                /* Domestic Tax Grid */
-                <div className="p-2.5 bg-white dark:bg-[#111113] rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
-                  <div className="flex justify-between items-center pb-1 border-b border-slate-100 dark:border-slate-800">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                      Domestic Tax Matrix
-                    </span>
-                    <Badge variant="outline" className="text-[9px] font-mono">
-                      DOMESTIC
-                    </Badge>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 text-[10px]">
-                    <div>
-                      <span className="text-[9px] text-slate-500 font-bold block uppercase">Base Fare *</span>
+                /* Domestic Tax Grid matching ERP screenshot */
+                <div className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden bg-white dark:bg-[#111113] shadow-xs">
+                  {/* Row 1: Fare & RN Header */}
+                  <div className="grid grid-cols-2 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 divide-x divide-slate-200 dark:divide-slate-800">
+                    <div className="flex items-center px-1.5 py-0.5">
+                      <span className="w-12 text-[10px] font-bold text-slate-700 dark:text-slate-300">Fare</span>
                       <Input
                         type="number"
                         value={item.base_fare || ""}
                         onChange={(e) => updateTicketLineItem(itemIdx, "base_fare", e.target.value, isEdit)}
-                        className="h-7 text-[11px] font-mono font-bold text-primary"
+                        className="h-6 text-[11px] font-mono font-bold text-primary bg-white dark:bg-[#161619] text-right"
                       />
                     </div>
-                    <div>
-                      <span className="text-[9px] text-slate-500 font-semibold block">CED</span>
+                    <div className="flex items-center px-1.5 py-0.5">
+                      <span className="w-10 text-[10px] font-semibold text-slate-600 dark:text-slate-400">RN</span>
+                      <Input
+                        type="number"
+                        value={item.tax_rn || ""}
+                        onChange={(e) => updateTicketLineItem(itemIdx, "tax_rn", e.target.value, isEdit)}
+                        className="h-6 text-[10px] font-mono bg-white dark:bg-[#161619] text-right"
+                      />
+                    </div>
+                  </div>
+
+                  {/* 4-Col Fixed Domestic Taxes Grid */}
+                  <div className="grid grid-cols-4 divide-x divide-y divide-slate-200 dark:divide-slate-800 text-[10px]">
+                    {/* Row 1: SP, CED, PK, Empty */}
+                    <div className="flex items-center px-1 py-0.5">
+                      <span className="w-8 text-[9px] font-bold text-slate-600 dark:text-slate-400">SP</span>
+                      <Input
+                        type="number"
+                        value={item.tax_sp || ""}
+                        onChange={(e) => updateTicketLineItem(itemIdx, "tax_sp", e.target.value, isEdit)}
+                        className="h-5 text-[10px] font-mono p-1 text-right"
+                      />
+                    </div>
+                    <div className="flex items-center px-1 py-0.5">
+                      <span className="w-8 text-[9px] font-bold text-slate-600 dark:text-slate-400">CED</span>
                       <Input
                         type="number"
                         value={item.tax_ced || ""}
                         onChange={(e) => updateTicketLineItem(itemIdx, "tax_ced", e.target.value, isEdit)}
-                        className="h-7 text-[10px] font-mono"
+                        className="h-5 text-[10px] font-mono p-1 text-right"
                       />
                     </div>
-                    <div>
-                      <span className="text-[9px] text-slate-500 font-semibold block">GST (Dom)</span>
+                    <div className="flex items-center px-1 py-0.5">
+                      <span className="w-8 text-[9px] font-bold text-slate-600 dark:text-slate-400">PK</span>
                       <Input
                         type="number"
-                        value={item.tax_gst_dom || ""}
-                        onChange={(e) => updateTicketLineItem(itemIdx, "tax_gst_dom", e.target.value, isEdit)}
-                        className="h-7 text-[10px] font-mono"
+                        value={item.tax_pk || ""}
+                        onChange={(e) => updateTicketLineItem(itemIdx, "tax_pk", e.target.value, isEdit)}
+                        className="h-5 text-[10px] font-mono p-1 text-right"
                       />
                     </div>
-                    <div>
-                      <span className="text-[9px] text-slate-500 font-semibold block">AST / Provincial</span>
+                    <div className="bg-slate-50/50 dark:bg-slate-900/30"></div>
+
+                    {/* Row 2: YR, PB, YQ, DOF */}
+                    <div className="flex items-center px-1 py-0.5">
+                      <span className="w-8 text-[9px] font-bold text-slate-600 dark:text-slate-400">YR</span>
                       <Input
                         type="number"
-                        value={item.tax_ast || ""}
-                        onChange={(e) => updateTicketLineItem(itemIdx, "tax_ast", e.target.value, isEdit)}
-                        className="h-7 text-[10px] font-mono"
+                        value={item.tax_yr || ""}
+                        onChange={(e) => updateTicketLineItem(itemIdx, "tax_yr", e.target.value, isEdit)}
+                        className="h-5 text-[10px] font-mono p-1 text-right"
                       />
                     </div>
-                    <div>
-                      <span className="text-[9px] text-slate-500 font-semibold block">APT (Airport Fee)</span>
+                    <div className="flex items-center px-1 py-0.5">
+                      <span className="w-8 text-[9px] font-bold text-slate-600 dark:text-slate-400">PB</span>
                       <Input
                         type="number"
-                        value={item.tax_apt || ""}
-                        onChange={(e) => updateTicketLineItem(itemIdx, "tax_apt", e.target.value, isEdit)}
-                        className="h-7 text-[10px] font-mono"
+                        value={item.tax_pb || ""}
+                        onChange={(e) => updateTicketLineItem(itemIdx, "tax_pb", e.target.value, isEdit)}
+                        className="h-5 text-[10px] font-mono p-1 text-right"
                       />
                     </div>
-                    <div>
-                      <span className="text-[9px] text-slate-500 font-semibold block">Other Taxes</span>
+                    <div className="flex items-center px-1 py-0.5">
+                      <span className="w-8 text-[9px] font-bold text-slate-600 dark:text-slate-400">YQ</span>
                       <Input
                         type="number"
-                        value={item.other_taxes || ""}
-                        onChange={(e) => updateTicketLineItem(itemIdx, "other_taxes", e.target.value, isEdit)}
-                        className="h-7 text-[10px] font-mono"
+                        value={item.tax_yq || ""}
+                        onChange={(e) => updateTicketLineItem(itemIdx, "tax_yq", e.target.value, isEdit)}
+                        className="h-5 text-[10px] font-mono p-1 text-right"
                       />
                     </div>
+                    <div className="flex items-center px-1 py-0.5">
+                      <span className="w-8 text-[9px] font-bold text-slate-600 dark:text-slate-400">DOF</span>
+                      <Input
+                        type="number"
+                        value={item.tax_dof || ""}
+                        onChange={(e) => updateTicketLineItem(itemIdx, "tax_dof", e.target.value, isEdit)}
+                        className="h-5 text-[10px] font-mono p-1 text-right"
+                      />
+                    </div>
+
+                    {/* Row 3: XZ, YD, YI, Empty */}
+                    <div className="flex items-center px-1 py-0.5">
+                      <span className="w-8 text-[9px] font-bold text-slate-600 dark:text-slate-400">XZ</span>
+                      <Input
+                        type="number"
+                        value={item.tax_xz || ""}
+                        onChange={(e) => updateTicketLineItem(itemIdx, "tax_xz", e.target.value, isEdit)}
+                        className="h-5 text-[10px] font-mono p-1 text-right"
+                      />
+                    </div>
+                    <div className="flex items-center px-1 py-0.5">
+                      <span className="w-8 text-[9px] font-bold text-slate-600 dark:text-slate-400">YD</span>
+                      <Input
+                        type="number"
+                        value={item.tax_yd || ""}
+                        onChange={(e) => updateTicketLineItem(itemIdx, "tax_yd", e.target.value, isEdit)}
+                        className="h-5 text-[10px] font-mono p-1 text-right"
+                      />
+                    </div>
+                    <div className="flex items-center px-1 py-0.5">
+                      <span className="w-8 text-[9px] font-bold text-slate-600 dark:text-slate-400">YI</span>
+                      <Input
+                        type="number"
+                        value={item.tax_yi || ""}
+                        onChange={(e) => updateTicketLineItem(itemIdx, "tax_yi", e.target.value, isEdit)}
+                        className="h-5 text-[10px] font-mono p-1 text-right"
+                      />
+                    </div>
+                    <div className="bg-slate-50/50 dark:bg-slate-900/30"></div>
                   </div>
                 </div>
               ) : (
